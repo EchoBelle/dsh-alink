@@ -21,9 +21,17 @@ const text = (maxLength = 4096) => ({ type: 'string', minLength: 1, maxLength })
 const id = { ...text(36), pattern: '^[a-f0-9-]{36}$' };
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object', properties, required, additionalProperties: false });
 const target = object({ cwd: text(), agentPreset: text(128) });
+const sourceId = { ...text(128), pattern: '^(?:(?:workbuddy|codex|raccoon|cursor|dsh):[a-f0-9]{32}|upload:[a-f0-9-]{36})$' };
+const titles = { type: 'object', maxProperties: 100, propertyNames: sourceId, additionalProperties: text(300) };
+const sourceIds = { type: 'array', minItems: 1, maxItems: 100, uniqueItems: true, items: sourceId };
 const queryFields = { text: { type: 'string', maxLength: 300 }, cursor: text(4096), limit: { type: 'integer', minimum: 1, maximum: 100 } };
 const requestSchemas: Record<string, unknown> = {
-  sources: object({}), targets: object({}), operations: object({}),
+  sources: object({}), targets: object({}), operations: object({}), transfers: object({}),
+  importMany: object({ requestId: id, sourceIds, titles, target: object({ cwd: text(), agentPreset: text(128) }, ['agentPreset']) }, ['requestId', 'sourceIds', 'target']),
+  exportMany: object({ requestId: id, sourceIds, titles }, ['requestId', 'sourceIds']),
+  transfer: object({ id }), cancelTransfer: object({ id }), retryTransfer: object({ id }),
+  retryOperation: object({ operationId: id }), removeOperation: object({ operationId: id }),
+  registerFiles: object({ path: text(), format: { enum: ['alink', 'dsh'] } }),
   sessions: object({ app: { enum: ['workbuddy', 'codex', 'raccoon', 'cursor'] }, ...queryFields }, ['app']),
   preview: object({ sourceId: text(128), target }),
   previewPage: object({ previewId: id, offset: { type: 'integer', minimum: 0 } }, ['previewId']),

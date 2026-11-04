@@ -17,6 +17,7 @@ export function apply(ctx: Context) {
     async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
       calls++;
       const text = JSON.stringify(options.messages);
+      if (/source-(tool|env|reasoning|compaction)-secret/.test(text)) throw new Error('Non-dialogue source data reached the resumed model');
       if (!text.includes('项目代号：海星') || !text.includes('已记录海星。') || !text.includes('项目代号是什么')) throw new Error('Migrated history absent from native continuation request');
       const block = { type: 'text' as const, text: '续聊已读取：海星' };
       yield { type: 'block-start', index: 0, blockType: 'text' };

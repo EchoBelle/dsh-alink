@@ -8,7 +8,7 @@ export async function normalizeBlocks(value: unknown, builder: ArchiveBuilder, r
   for (const item of Array.isArray(value) ? value : [value]) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) { result.push({ type: 'opaque', value: item }); continue; }
     const block = asRecord(item), kind = String(block.type ?? 'unknown');
-    if (['text', 'input_text', 'output_text', 'summary_text', 'reasoning_text'].includes(kind) && typeof block.text === 'string') result.push({ type: 'text', text: block.text });
+    if (['text', 'input_text', 'output_text'].includes(kind) && typeof block.text === 'string') result.push({ type: 'text', text: block.text });
     else if (['image', 'input_image', 'image_url', 'file', 'audio', 'input_audio', 'video'].includes(kind)) {
       let uri = block.image_url ?? block.url ?? block.path ?? block.file_url;
       if (uri && typeof uri === 'object') uri = uri.url;
@@ -21,7 +21,7 @@ export async function normalizeBlocks(value: unknown, builder: ArchiveBuilder, r
 }
 export async function normalizeResponse(row: Record<string, any>, builder: ArchiveBuilder, ref: string, roots: readonly string[], codex = false, timestamp?: string | number): Promise<void> {
   const kind = String(row.type ?? 'unknown');
-  const attrs = { native_type: kind, ...(row.id === undefined ? {} : { native_id: String(row.id) }),
+  const attrs = { native_type: kind, ...(['analysis', 'summary'].includes(row.channel) || (row.recipient && row.recipient !== 'all') ? { projection: 'auxiliary' as const } : {}), ...(row.id === undefined ? {} : { native_id: String(row.id) }),
     ...(row.parentId === undefined ? {} : { parent_native_id: String(row.parentId) }),
     ...(timestamp === undefined && row.timestamp === undefined ? {} : { timestamp: timestamp ?? row.timestamp }) };
   if (kind === 'message') await builder.event(ref, 'message', { ...attrs, role: String(row.role ?? 'unknown'), content: await normalizeBlocks(row.content, builder, ref, roots) });

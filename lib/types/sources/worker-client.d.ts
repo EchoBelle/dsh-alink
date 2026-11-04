@@ -8,6 +8,14 @@ export type ArchiveTask = {
     path: string;
     destination: string;
 } | {
+    kind: 'import-many';
+    path: string;
+    destination: string;
+} | {
+    kind: 'export-many';
+    paths: string[];
+    destination: string;
+} | {
     kind: 'export';
     path: string;
     destination: string;

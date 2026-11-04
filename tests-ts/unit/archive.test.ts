@@ -95,3 +95,14 @@ it('rejects malicious manifest paths after ZIP extraction, before a later direct
   const archive=path.join(root,'bad.zip');await writeFile(archive,await done);
   await expect(importArchive(archive,path.join(root,'unpacked'),new AbortController().signal)).rejects.toThrow(/reference|path/);
 });
+
+it('rejects collection references outside their session directories and duplicate entries', async () => {
+  const root = await temp(), { default: yazl } = await import('yazl'), { importArchives } = await import('../../src/archive.js');
+  for (const [index, sessions] of [['../outside'], ['sessions/00000000-0000-4000-8000-000000000001', 'sessions/00000000-0000-4000-8000-000000000001']].entries()) {
+    const zip = new yazl.ZipFile(), chunks: Buffer[] = [];
+    const done = new Promise<Buffer>((resolve, reject) => { zip.outputStream.on('data', chunk => chunks.push(chunk)); zip.outputStream.on('end', () => resolve(Buffer.concat(chunks))); zip.outputStream.on('error', reject); });
+    zip.addBuffer(Buffer.from(JSON.stringify({ format: 'alink.collection', version: '0.1.0', sessions })), 'collection.json'); zip.end();
+    const file = path.join(root, index + '.zip'); await writeFile(file, await done);
+    await expect(importArchives(file, path.join(root, 'extract-' + index), new AbortController().signal)).rejects.toThrow(/collection/i);
+  }
+});

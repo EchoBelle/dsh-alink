@@ -29,8 +29,20 @@ export interface ArchiveManifest {
 }
 export type IssueDisposition = 'native' | 'rendered' | 'archive-only' | 'missing' | 'blocked';
 export interface MigrationIssue { code: string; disposition: IssueDisposition; recordRef?: string; resourceId?: string; detail: string }
-export interface MappingReport { mappingVersion: '1'; issues: MigrationIssue[]; counts: Record<IssueDisposition, number>; reportHash: string }
+export interface MappingReport { mappingVersion: '1' | '2'; issues: MigrationIssue[]; counts: Record<IssueDisposition, number>; reportHash: string }
 export interface Preview { previewId: string; snapshotDigest: string; target: TargetSelection; report: MappingReport }
 export type OperationState = 'prepared' | 'writing' | 'verifying' | 'completed' | 'failed' | 'canceled' | 'needs-attention';
-export interface Operation { operationId: string; previewId: string; state: OperationState; targetSessionId: string; stage: string; errorCode?: string; title: string }
+export interface Operation { operationId: string; previewId: string; state: OperationState; targetSessionId: string; stage: string; errorCode?: string; title: string; hidden?: boolean; outdated?: boolean }
 export interface CommitRequest { previewId: string; reportHash: string; requestId: string }
+
+export interface TransferItem {
+  sourceId: string; title: string; state: 'pending' | 'running' | 'completed' | 'failed' | 'canceled';
+  operationId?: string; errorCode?: string; warning?: string;
+}
+export interface Transfer {
+  id: string; kind: 'import' | 'export'; state: 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'canceled';
+  items: TransferItem[]; createdAt: number; downloadable?: boolean; errorCode?: string;
+}
+export interface TransferRequest {
+  requestId: string; kind: 'import' | 'export'; sourceIds: string[]; titles?: Record<string, string>; target?: { cwd?: string; agentPreset: string };
+}

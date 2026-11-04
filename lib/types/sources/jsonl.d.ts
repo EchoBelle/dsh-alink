@@ -12,3 +12,4 @@ export declare function readJsonStream(input: AsyncIterable<Buffer>, options?: {
     lossless?: boolean;
 }): AsyncGenerator<any>;
 export declare function snapshotFile(source: string, destination: string, maxBytes?: number, signal?: AbortSignal): Promise<void>;
+export declare function snapshotPrefix(source: string, destination: string, bytes: number, signal?: AbortSignal): Promise<void>;

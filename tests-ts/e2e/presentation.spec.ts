@@ -25,12 +25,16 @@ test('groups projects, shows only dialogue and keeps long content inside both la
   await page.getByRole('button', { name: 'Alink', exact: true }).click();
   const groups = page.locator('.dsh-alink-project');
   await expect(groups).toHaveCount(2);
+  await page.getByRole('checkbox', { name: '全选当前列表', exact: true }).check();
+  await expect(page.getByRole('button', { name: '导入所选（2）', exact: true })).toBeEnabled();
+  await page.getByRole('checkbox', { name: '选择项目：' + root, exact: true }).uncheck();
+  await expect(page.getByRole('button', { name: '导入所选（1）', exact: true })).toBeEnabled();
   const group = groups.filter({ has: page.locator('summary', { hasText: 'project-b-' }) });
   await group.locator('summary').click();
   await expect(group.getByRole('button')).toBeHidden();
   await group.locator('summary').click();
   await group.getByRole('button').click();
-  await page.getByRole('button', { name: '生成迁移预览', exact: true }).click();
+  await page.getByRole('button', { name: '查看对话', exact: true }).click();
   const history = page.getByRole('region', { name: '对话历史', exact: true });
   await expect(history.locator('article')).toHaveCount(2);
   await expect(history).toContainText('这是用户的问题。');

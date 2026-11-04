@@ -1,5 +1,5 @@
 import { parentPort } from 'node:worker_threads';
-import { validateArchive, importArchive, exportArchive } from '../archive.js';
+import { validateArchive, importArchive, exportArchive, importArchives, exportArchives } from '../archive.js';
 import { captureLegacy } from './dsh-legacy.js';
 import { SourceRegistry } from './registry.js';
 import type { ArchiveTask } from './worker-client.js';
@@ -16,8 +16,14 @@ parentPort!.once('message', async (task: ArchiveTask) => {
     else if (task.kind === 'capture') value = await new SourceRegistry(task.roots, task.resourceRoots).capture(task.sourceId, task.destination);
     else if (task.kind === 'validate') { await validateArchive(task.path); value = { valid: true }; }
     else if (task.kind === 'import') value = await importArchive(task.path, task.destination, new AbortController().signal);
+    else if (task.kind === 'import-many') value = await importArchives(task.path, task.destination, new AbortController().signal);
+    else if (task.kind === 'export-many') { await exportArchives(task.paths, task.destination); value = { file: task.destination }; }
     else { await exportArchive(task.path, task.destination); value = { file: task.destination }; }
     parentPort!.postMessage({ ok: true, value });
-  } catch (error) { parentPort!.postMessage({ ok: false, code: error && typeof error === 'object' && 'code' in error ? error.code : 'SOURCE_ERROR', error: error instanceof Error ? error.message : 'Worker failed' }); }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Worker failed';
+    const code = ['Archive exceeds size limit', 'Source exceeds size limit', 'JSONL line exceeds size limit'].includes(message) ? 'CONTENT_LIMIT' : error && typeof error === 'object' && 'code' in error ? error.code : 'SOURCE_ERROR';
+    parentPort!.postMessage({ ok: false, code, error: message });
+  }
   finally { parentPort!.close(); }
 });

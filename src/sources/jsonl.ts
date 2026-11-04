@@ -1,4 +1,5 @@
 import { createReadStream, createWriteStream } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { stat, rm, chmod } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
 import { Transform } from 'node:stream';
@@ -46,4 +47,19 @@ export async function snapshotFile(source: string, destination: string, maxBytes
     if (before.size !== after.size || before.mtimeNs !== after.mtimeNs || before.ino !== after.ino || BigInt(total) !== after.size) throw new Error('SOURCE_CHANGED');
     await chmod(destination, 0o600);
   } catch (error) { if (created) await rm(destination, { force: true }); throw error; }
+}
+
+export async function snapshotPrefix(source: string, destination: string, bytes: number, signal?: AbortSignal): Promise<void> {
+  const before = await stat(source);
+  if (!Number.isSafeInteger(bytes) || bytes < 1 || bytes > MAX_ARCHIVE_BYTES || !before.isFile() || before.size < bytes) throw new Error('Invalid history prefix');
+  const hash = createHash('sha256'); let total = 0, last = 0;
+  try {
+    await pipeline(createReadStream(source, { end: bytes - 1 }), new Transform({ transform(chunk, _encoding, done) {
+      total += chunk.length; last = chunk.at(-1); hash.update(chunk); done(null, chunk);
+    } }), createWriteStream(destination, { flags: 'wx', mode: 0o600 }), { signal });
+    if (total !== bytes || last !== 10) throw new Error('Invalid history prefix boundary');
+    const verify = createHash('sha256');
+    for await (const chunk of createReadStream(source, { end: bytes - 1, signal })) verify.update(chunk);
+    if (hash.digest('hex') !== verify.digest('hex') || before.ino !== (await stat(source)).ino) throw new Error('SOURCE_CHANGED');
+  } catch (error) { await rm(destination, { force: true }); throw error; }
 }

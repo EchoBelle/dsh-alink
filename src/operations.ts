@@ -8,7 +8,7 @@ import { SessionId } from '@deepseek-ai/dsh-session';
 import { Ledger } from './ledger.js';
 import { LinkError } from './transport.js';
 import type { CaptureResult, CommitRequest, Operation, Preview, SourceApp, SourceSession, Page, TargetSelection } from './contracts.js';
-import { buildMigrationPlan, freezeHistory, type MappingLimits, type MigrationPlan } from './mapping.js';
+import { buildMigrationPlan, freezeHistory, MAPPING_VERSION, type MappingLimits, type MigrationPlan } from './mapping.js';
 import { validatePlannedImages, admitResources } from './dsh/attachments.js';
 import { digest, type FrozenHistory } from './dsh/history.js';
 import { verifyHistory } from './dsh/persistence.js';
@@ -52,21 +52,26 @@ export class MigrationService {
     try { return JSON.parse(await readFile(path.join(this.options.directory, 'uploads', id, 'source.json'), 'utf8')); }
     catch { throw new LinkError('INVALID_SOURCE'); }
   }
-  private async active(sourceId: string, signal?: AbortSignal): Promise<SourceLocator> {
+  async source(sourceId: string, signal?: AbortSignal): Promise<SourceLocator> {
     const upload = await this.upload(sourceId);
     return this.options.worker.run({ kind: 'active', roots: this.options.roots, sourceId: upload?.nativeSourceId ?? sourceId }, signal);
   }
+  async captureSource(sourceId: string, destination: string, signal?: AbortSignal): Promise<CaptureResult> {
+    this.ready(); await this.source(sourceId, signal);
+    const upload = await this.upload(sourceId);
+    const result = upload ? await this.options.worker.run<CaptureResult>({ kind: 'import', path: upload.archivePath, destination }, signal)
+      : await this.options.worker.run<CaptureResult>({ kind: 'capture', roots: this.options.roots, resourceRoots: this.options.resourceRoots, sourceId, destination }, signal);
+    await this.source(sourceId, signal); return result;
+  }
   async preview(sourceId: string, target: TargetSelection, signal?: AbortSignal): Promise<Preview> {
     this.ready(); const resolved = await this.options.resolveTarget(target);
-    const cwd = await realpath(resolved.cwd);
-    if (!(await stat(cwd)).isDirectory()) throw new LinkError('INVALID_TARGET');
-    await this.active(sourceId, signal);
+    let cwd: string;
+    try { cwd = await realpath(resolved.cwd); if (!(await stat(cwd)).isDirectory()) throw new LinkError('INVALID_TARGET'); }
+    catch (error) { if (error instanceof LinkError) throw error; throw new LinkError('INVALID_TARGET'); }
+    await this.source(sourceId, signal);
     const previewId = randomUUID(), destination = path.join(this.options.directory, 'snapshots', previewId);
     try {
-      const upload = await this.upload(sourceId);
-      const captured = upload ? await this.options.worker.run<CaptureResult>({ kind: 'import', path: upload.archivePath, destination }, signal)
-        : await this.options.worker.run<CaptureResult>({ kind: 'capture', roots: this.options.roots, resourceRoots: this.options.resourceRoots, sourceId, destination }, signal);
-      await this.active(sourceId, signal);
+      const captured = await this.captureSource(sourceId, destination, signal);
       const plan = await buildMigrationPlan(captured.archivePath, { cwd, agentPreset: resolved.agentPreset }, this.options.limits);
       await validatePlannedImages(plan, this.options.attachments);
       this.ready();
@@ -88,13 +93,14 @@ export class MigrationService {
   async commit(request: CommitRequest): Promise<Operation> {
     this.ready();
     const value = this.stored(request.previewId);
+    if (value.plan.report.mappingVersion !== MAPPING_VERSION) throw new LinkError('MAPPING_CHANGED');
     if (request.reportHash !== value.preview.report.reportHash) throw new LinkError('PREVIEW_CHANGED');
     if (value.preview.report.counts.blocked) throw new LinkError('HISTORY_BLOCKED');
     if (!request.requestId || request.requestId.length > 128) throw new LinkError('INVALID_REQUEST');
-    await this.active(value.sourceId);
+    await this.source(value.sourceId);
     const target = await this.options.resolveTarget(value.plan.target);
     if (await realpath(target.cwd) !== value.plan.target.cwd || target.agentPreset !== value.plan.target.agentPreset) throw new LinkError('TARGET_CHANGED');
-    const key = digest({ snapshot: value.plan.snapshotDigest, target: value.plan.target, mapping: '1', namespace: this.options.namespace });
+    const key = digest({ snapshot: value.plan.snapshotDigest, target: value.plan.target, mapping: MAPPING_VERSION, namespace: this.options.namespace });
     const operation = this.ledger.reserve(request.previewId, key, request.requestId, value.plan.title);
     if (operation.state === 'completed') {
       if (!await this.options.store.stat(SessionId(operation.targetSessionId))) throw new LinkError('TARGET_MISSING');
@@ -112,13 +118,14 @@ export class MigrationService {
   private async run(operation: Operation, saved: StoredPreview, signal: AbortSignal): Promise<void> {
     let touched = false;
     try {
+      if (saved.plan.report.mappingVersion !== MAPPING_VERSION) throw new LinkError('MAPPING_CHANGED');
       await this.ledger.withWriter(async () => {
         try {
           const directory = path.join(this.options.directory, 'operations', operation.operationId); await mkdir(directory, { recursive: true, mode: 0o700 });
           const historyFile = path.join(directory, 'history.json');
           touched = !!await this.options.store.stat(SessionId(operation.targetSessionId));
           operation.state = 'writing'; operation.stage = 'checking-source'; delete operation.errorCode;
-          await this.active(saved.sourceId, signal);
+          await this.source(saved.sourceId, signal);
           await this.options.worker.run({ kind: 'validate', path: saved.plan.archivePath }, signal);
           if (await archiveDigest(saved.plan.archivePath) !== saved.plan.snapshotDigest) throw new LinkError('SNAPSHOT_CHANGED');
           let history: FrozenHistory;
@@ -131,7 +138,7 @@ export class MigrationService {
             await atomicJson(historyFile, history);
           }
           if (digest(history.events) !== history.eventsDigest || history.header.id !== operation.targetSessionId || history.header.cwd !== saved.plan.target.cwd || history.header.agentPreset !== saved.plan.target.agentPreset) throw new LinkError('HISTORY_CHANGED');
-          await this.active(saved.sourceId, signal); signal.throwIfAborted();
+          await this.source(saved.sourceId, signal); signal.throwIfAborted();
           operation.stage = 'persisting';
           const exists = await this.options.store.stat(history.header.id);
           const handle = exists ? await this.options.store.open(history.header.id, 'write', { signal }) : await this.options.store.create(history.header, { signal });
@@ -161,9 +168,29 @@ export class MigrationService {
   }
   operation(id: string): Operation {
     this.ledger.reconcile(new Set(this.jobs.keys()));
-    const op = this.jobs.get(id)?.operation ?? this.ledger.operation(id); if (!op) throw new LinkError('OPERATION_NOT_FOUND'); return { ...op };
+    const op = this.jobs.get(id)?.operation ?? this.ledger.operation(id); if (!op) throw new LinkError('OPERATION_NOT_FOUND'); return { ...op, outdated: this.stored(op.previewId).plan.report.mappingVersion !== MAPPING_VERSION };
   }
-  operations(): Operation[] { this.ledger.reconcile(new Set(this.jobs.keys())); return this.ledger.operations().map(op => ({ ...(this.jobs.get(op.operationId)?.operation ?? op) })); }
+  operations(): Operation[] { this.ledger.reconcile(new Set(this.jobs.keys())); return this.ledger.operations().map(op => this.operation(op.operationId)); }
+  async wait(id: string, signal?: AbortSignal): Promise<Operation> {
+    const abort = () => this.cancel(id);
+    signal?.addEventListener('abort', abort, { once: true });
+    try {
+      if (signal?.aborted) abort();
+      await this.jobs.get(id)?.promise;
+      return this.operation(id);
+    } finally { signal?.removeEventListener('abort', abort); }
+  }
+  async retryOperation(id: string): Promise<Operation> {
+    const op = this.operation(id), saved = this.stored(op.previewId);
+    if (this.jobs.has(id)) throw new LinkError('IMPORT_BUSY');
+    const preview = saved.plan.report.mappingVersion === MAPPING_VERSION ? saved.preview : await this.preview((await this.upload(saved.sourceId))?.nativeSourceId ?? saved.sourceId, saved.plan.target);
+    return this.commit({ previewId: preview.previewId, reportHash: preview.report.reportHash, requestId: randomUUID() });
+  }
+  removeOperation(id: string): void {
+    const operation = this.operation(id);
+    if (this.jobs.has(id) || ['prepared', 'writing', 'verifying'].includes(operation.state)) throw new LinkError('IMPORT_BUSY');
+    this.ledger.hide(id);
+  }
   cancel(id: string): Operation {
     const active = this.jobs.get(id); if (active) active.controller.abort();
     return this.operation(id);
@@ -182,6 +209,34 @@ export class MigrationService {
     })();
     this.exports.set(id, pending);
     try { return await pending; } finally { this.exports.delete(id); }
+  }
+  async registerFiles(input: string, format: 'alink' | 'dsh', signal?: AbortSignal): Promise<{ sources: SourceSession[]; errors: string[] }> {
+    if (format === 'dsh') return { sources: [await this.registerFile(input, format, signal)], errors: [] };
+    this.ready();
+    const staging = path.join(this.options.directory, 'uploads', 'bundle-' + randomUUID());
+    await mkdir(staging, { mode: 0o700 });
+    const sources: SourceSession[] = [], errors: string[] = [];
+    try {
+      const captures = await this.options.worker.run<CaptureResult[]>({ kind: 'import-many', path: input, destination: path.join(staging, 'archive') }, signal);
+      for (const capture of captures) {
+        signal?.throwIfAborted();
+        const id = randomUUID(), directory = path.join(this.options.directory, 'uploads', id);
+        try {
+          const meta = await readManifest(capture.archivePath), root = this.options.roots[meta.source.app];
+          if (!root || !meta.session.native_id) throw new LinkError('SOURCE_INACTIVE');
+          const nativeSourceId = sourceKey(meta.source.app, root, meta.session.native_id), native = await this.source(nativeSourceId, signal);
+          await mkdir(directory, { mode: 0o700 });
+          const archivePath = path.join(directory, 'archive'); await rename(capture.archivePath, archivePath);
+          await atomicJson(path.join(directory, 'source.json'), { nativeSourceId, archivePath, title: meta.session.title ?? native.title } satisfies UploadSource);
+          sources.push({ sourceId: 'upload:' + id, app: native.app, nativeId: native.nativeId, title: meta.session.title ?? native.title, cwd: meta.session.cwd });
+        } catch (error) {
+          await rm(directory, { recursive: true, force: true });
+          errors.push(error instanceof LinkError ? error.code : 'SOURCE_ERROR');
+        }
+      }
+      if (!sources.length) throw new LinkError(errors[0] || 'INVALID_SOURCE');
+      return { sources, errors };
+    } finally { await rm(staging, { recursive: true, force: true }); }
   }
   async registerFile(input: string, format: 'alink' | 'dsh', signal?: AbortSignal): Promise<SourceSession> {
     this.ready(); const id = randomUUID(), directory = path.join(this.options.directory, 'uploads', id); await mkdir(directory, { mode: 0o700 });

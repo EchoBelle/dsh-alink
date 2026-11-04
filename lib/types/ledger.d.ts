@@ -9,6 +9,7 @@ export declare class Ledger {
     operation(id: string): Operation | undefined;
     operations(): Operation[];
     reserve(preview: string, dedup: string, requestId: string, title: string): Operation;
+    hide(id: string): void;
     update(operation: Operation): void;
     withWriter<T>(action: () => Promise<T>): Promise<T>;
     reconcile(active?: ReadonlySet<string>): void;

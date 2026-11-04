@@ -29,7 +29,7 @@ export class Ledger {
     const row = this.reader.prepare('SELECT value FROM operations WHERE id=?').get(id);
     return row ? JSON.parse(String(row.value)) : undefined;
   }
-  operations(): Operation[] { return this.reader.prepare('SELECT value FROM operations ORDER BY rowid DESC LIMIT 100').all().map(row => JSON.parse(String(row.value))); }
+  operations(): Operation[] { return this.reader.prepare("SELECT value FROM operations WHERE json_extract(value, '$.hidden') IS NOT 1 ORDER BY rowid DESC LIMIT 100").all().map(row => JSON.parse(String(row.value))); }
   reserve(preview: string, dedup: string, requestId: string, title: string): Operation {
     const request = this.reader.prepare('SELECT * FROM requests WHERE id=?').get(requestId);
     if (request) {
@@ -42,10 +42,16 @@ export class Ledger {
       const existing = this.writer.prepare('SELECT value FROM operations WHERE dedup=?').get(dedup);
       const op: Operation = existing ? JSON.parse(String(existing.value)) : { operationId: randomUUID(), previewId: preview, title,
         targetSessionId: 'dsh-alink-' + randomUUID(), state: 'prepared', stage: 'queued' };
+      if (existing && op.hidden) { delete op.hidden; this.update(op); }
       if (!existing) this.writer.prepare('INSERT INTO operations VALUES (?,?,?)').run(op.operationId, dedup, JSON.stringify(op));
       this.writer.prepare('INSERT INTO requests VALUES (?,?,?)').run(requestId, preview, op.operationId);
       this.writer.exec('COMMIT'); return op;
     } catch (error) { this.writer.exec('ROLLBACK'); throw error; }
+  }
+  hide(id: string): void {
+    if (this.writing) throw new LinkError('IMPORT_BUSY');
+    const operation = this.operation(id); if (!operation) throw new LinkError('OPERATION_NOT_FOUND');
+    operation.hidden = true; this.update(operation);
   }
   update(operation: Operation): void {
     this.writer.prepare('UPDATE operations SET value=? WHERE id=?').run(JSON.stringify(operation), operation.operationId);

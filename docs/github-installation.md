@@ -4,11 +4,17 @@
 
 ```sh
 dsh --profile web --dump-config
-dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.2
+dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.2.0
 dsh web
 ```
 
 仓库跟踪源码和预构建 lib，GitHub 安装不执行 prepare/prepack 构建。修改源码后须运行 build 并提交对应 lib。
+
+## 0.2.0 验收
+
+本地发布包已在官方未修改的 DSH 0.2.1-rc.5 的全新 profile 中完成安装验收。34 项单元、21 项集成、11 项浏览器检查通过，覆盖真正写入 DSH 的纯对话历史、批量导出与导入、记录删除、任务恢复和归档拦截；5 条会话分别通过重启及卸载插件后的续聊。
+
+具体测试与本机 20 条有效来源的只读检查见 [验证记录](dsh-alink-verification.md)。
 
 ## 0.1.2 验收
 
@@ -39,7 +45,7 @@ pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
-node scripts/release-smoke.mjs github:EchoBelle/dsh-alink#v0.1.2
+node scripts/release-smoke.mjs github:EchoBelle/dsh-alink#v0.2.0
 ```
 
 需要本机 Google Chrome。验收使用合成来源和本地测试模型，不迁移日常会话，不发起真实模型请求。结果保存在 .local/releases/latest-smoke.json，日志位于 .local/verification。

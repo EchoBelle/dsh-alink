@@ -35,8 +35,8 @@ test('archiving after backup/preview blocks list, backup upload, commit and retr
     const oldPreview=await rpc('previewPage',{previewId:op.previewId});
     expect(await rpc('commit',{previewId:op.previewId,reportHash:oldPreview.value.preview.report.reportHash,requestId:'archived-retry'})).toMatchObject({ok:false,error:{code:'SOURCE_INACTIVE'}});
     await page.getByRole('button',{name:'Alink',exact:true}).click();
-    await expect(page.getByRole('button',{name:'打开预览：活动会话 海星'})).toHaveCount(0);
-    await page.getByText('从备份导入',{exact:true}).click();
+    await expect(page.getByRole('button',{name:'打开会话：活动会话 海星'})).toHaveCount(0);
+    await page.getByRole('button',{name:'从本地导入',exact:true}).click();
     await page.getByLabel('备份文件').setInputFiles(file);
     await expect(page.getByRole('alert')).toContainText('原会话已归档');
   } finally { db.exec("UPDATE sessions SET status='completed' WHERE id='active'");db.close(); }

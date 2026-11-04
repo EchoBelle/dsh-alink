@@ -39,13 +39,6 @@
 .dsh-alink-project-path { margin: 5px 0 8px; font-size: 11px; color: var(--link-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-alink-project-sessions { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .dsh-alink-project-sessions button { display: block; flex-shrink: 0; text-align: left; border-color: transparent; padding: 10px; width: 100%; }
-.dsh-alink-project-sessions button.selected { background: color-mix(in srgb,currentColor 7%,transparent); border-color: var(--link-line); }
-.dsh-alink-project-sessions button span { display: block; overflow-wrap: anywhere; }
-.dsh-alink-import { font-size: 12px; margin-top: 18px; border-top: 1px solid var(--link-line); padding-top: 16px; }
-.dsh-alink-import summary { cursor: pointer; }
-.dsh-alink-import p { color: var(--link-muted); }
-.dsh-alink-import label { margin-bottom: 14px; }
-.dsh-alink-file input { font-size: 11px; }
 .dsh-alink-preview { padding: 24px; min-width: 0; }
 .dsh-alink-empty { padding: 24px 6px; color: var(--link-muted); font-size: 13px; }
 .dsh-alink-targets { display: grid; grid-template-columns: minmax(0,1fr) minmax(120px,160px); gap: 14px; margin-bottom: 15px; }
@@ -55,7 +48,6 @@
 .dsh-alink-messages article:last-child { border-bottom: 0; }
 .dsh-alink-messages small { font-size: 11px; color: var(--link-muted); }
 .dsh-alink-messages pre { font: inherit; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; margin: 9px 0 0; max-width: 100%; }
-.dsh-alink-submit { display: flex; justify-content: flex-end; margin-top: 18px; }
 .dsh-alink-error { border: 1px solid #c43e3260; background: #c43e320c; color: #c43e32; border-radius: 9px; padding: 12px 15px; margin: 16px 0; font-size: 13px; overflow-wrap: anywhere; }
 .dsh-alink-operations { margin-top: 26px; }
 .dsh-alink-operations article { border-top: 1px solid var(--link-line); padding: 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -73,3 +65,54 @@
   .dsh-alink-operation-actions { max-width: 100%; justify-content: flex-start; }
 }
 @media (max-width: 600px) { .dsh-alink { padding: 14px; } }
+/* Selection and transfer controls share a compact, responsive workspace. */
+.dsh-alink-header { flex-wrap: wrap; }
+.dsh-alink-header nav { display: flex; gap: 4px; margin-right: auto; }
+.dsh-alink-header nav button { border-color: transparent; }
+.dsh-alink-header nav button.current { background: color-mix(in srgb,currentColor 7%,transparent); font-weight: 600; }
+.dsh-alink-header-actions, .dsh-alink-primary-actions, .dsh-alink-task-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dsh-alink-columns { grid-template-columns: minmax(260px,35%) minmax(0,1fr); }
+.dsh-alink input[type=checkbox] { appearance: auto; accent-color: CanvasText; width: 16px; height: 16px; min-width: 16px; padding: 0; margin: 0; display: inline-block; vertical-align: middle; }
+.dsh-alink-list-tools { display: flex; justify-content: space-between; align-items: center; color: var(--link-muted); font-size: 12px; margin: 12px 0; }
+.dsh-alink-list-tools label { display: flex; align-items: center; gap: 8px; }
+.dsh-alink .dsh-alink-project summary input[type=checkbox] { margin: 0 8px 0 3px; }
+.dsh-alink-session-row { display: flex; align-items: flex-start; gap: 8px; border: 1px solid transparent; border-radius: 8px; padding-left: 8px; min-width: 0; }
+.dsh-alink .dsh-alink-session-row>input[type=checkbox] { margin-top: 13px; }
+.dsh-alink-session-row.selected { background: color-mix(in srgb,currentColor 5%,transparent); border-color: var(--link-line); }
+.dsh-alink-project-sessions .dsh-alink-session-row button { flex: 1; min-width: 0; width: auto; padding: 9px 7px; }
+.dsh-alink-selection-heading { display: flex; align-items: start; gap: 12px; justify-content: space-between; }
+.dsh-alink-selection-heading button { font-size: 11px; padding: 3px 7px; flex-shrink: 0; }
+.dsh-alink-picked { list-style: none; padding: 0; margin: 0 0 18px; max-height: 150px; overflow: auto; }
+.dsh-alink-picked li { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; }
+.dsh-alink-picked li>span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-alink-picked small { color: var(--link-muted); }
+.dsh-alink-picked button { border: 0; padding: 0 6px; font-size: 18px; line-height: 1; }
+.dsh-alink-unified { margin: 0 0 16px; }
+.dsh-alink-primary-actions { padding-top: 4px; }
+.dsh-alink-primary-actions button { flex: 1; min-height: 42px; }
+.dsh-alink-inspect { margin-top: 24px; border-top: 1px solid var(--link-line); }
+.dsh-alink-preview-actions h3 { min-width: 0; overflow-wrap: anywhere; flex: 1; }
+.dsh-alink-preview-actions button { flex-shrink: 0; }
+.dsh-alink-transfer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; margin: 0 0 16px; border: 1px solid var(--link-line); border-radius: 10px; background: color-mix(in srgb,currentColor 2%,Canvas); }
+.dsh-alink-transfer>div:first-child { display: grid; gap: 5px; min-width: 0; }
+.dsh-alink-transfer strong { font-size: 13px; }
+.dsh-alink-transfer span, .dsh-alink-transfer small { font-size: 12px; color: var(--link-muted); overflow-wrap: anywhere; }
+.dsh-alink-task-actions { flex-shrink: 0; max-width: 50%; justify-content: flex-end; }
+.dsh-alink-task-actions a { display: inline-block; font-size: 13px; color: CanvasText; border: 1px solid var(--link-line); border-radius: 8px; padding: 9px 12px; text-decoration: none; }
+.dsh-alink-local { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 12px; border: 1px solid var(--link-line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.dsh-alink-local input[type=file] { font-size: 11px; }
+.dsh-alink-notice { font-size: 13px; color: var(--link-muted); }
+.dsh-alink-operations { margin-top: 0; }
+@container (max-width: 760px) {
+  .dsh-alink-columns { grid-template-columns: minmax(0,1fr); }
+  .dsh-alink-sources { border-right: 0; border-bottom: 1px solid var(--link-line); }
+  .dsh-alink-session-list { max-height: 280px; }
+  .dsh-alink-local { grid-template-columns: minmax(0,1fr); }
+  .dsh-alink-transfer { align-items: stretch; flex-direction: column; }
+  .dsh-alink-task-actions { max-width: none; justify-content: flex-start; }
+}
+@media (max-width: 600px) { .dsh-alink-header-actions { width: 100%; } .dsh-alink-header-actions button { flex: 1; } }
+.dsh-alink-transfer.is-complete { flex-direction: row; align-items: center; padding: 10px 14px; }
+.dsh-alink-transfer.is-complete>div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dsh-alink-transfer.is-complete .dsh-alink-task-actions { width: auto; max-width: 50%; }
+.dsh-alink-transfer.is-complete button, .dsh-alink-transfer.is-complete a { padding: 6px 9px; font-size: 11px; }

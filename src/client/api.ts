@@ -1,5 +1,8 @@
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection/client';
 const errors: Record<string, string> = {
+  SOURCE_HISTORY_MISSING: '来源历史日志尚未完整保存，请在原应用打开该会话后重试。',
+  MAPPING_CHANGED: '迁入规则已更新，请重新导入以生成仅包含对话的新会话。',
+  CANCELED: '任务已停止。', EXPORT_NOT_READY: '导出文件尚未准备好。', TRANSFER_NOT_FOUND: '任务记录不存在，请刷新。',
   INTERRUPTED: '上次迁移中断，原目标会话标识已保留。请重新核对并重试。',
   SOURCE_INACTIVE: '原会话已归档、删除或无法核实当前状态，不能迁移。请刷新来源。', SOURCE_ERROR: '来源暂时无法读取，请刷新后重试。',
   PREVIEW_CHANGED: '预览已改变，请重新生成迁移预览。', SNAPSHOT_CHANGED: '备份内容发生变化，请重新生成预览。',

@@ -4,6 +4,8 @@ import type { SourceRoots } from './types.js';
 import type { SourceApp } from '../contracts.js';
 export type ArchiveTask = { kind: 'validate'; path: string }
   | { kind: 'import'; path: string; destination: string }
+  | { kind: 'import-many'; path: string; destination: string }
+  | { kind: 'export-many'; paths: string[]; destination: string }
   | { kind: 'export'; path: string; destination: string }
   | { kind: 'legacy-file'; roots: SourceRoots; sourceId: string; path: string; destination: string }
   | { kind: 'sources'; roots: SourceRoots }

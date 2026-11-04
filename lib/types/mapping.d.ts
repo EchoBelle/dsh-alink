@@ -1,3 +1,4 @@
+export declare const MAPPING_VERSION: "2";
 import type { MappingReport, TargetSelection, PortableResource } from './contracts.js';
 import { type FrozenHistory } from './dsh/history.js';
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';

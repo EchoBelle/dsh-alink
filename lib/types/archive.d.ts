@@ -17,8 +17,8 @@ export declare class ArchiveBuilder {
     event(record_ref: string, kind: string, attrs?: Partial<PortableEvent>): Promise<void>;
     issue(code: string, detail: string): void;
     object(data: Uint8Array): Promise<ObjectRef>;
-    objectFile(file: string, signal?: AbortSignal): Promise<ObjectRef>;
-    originalFile(file: string, name?: string, signal?: AbortSignal): Promise<string>;
+    objectFile(file: string, signal?: AbortSignal, prefixBytes?: number): Promise<ObjectRef>;
+    originalFile(file: string, name?: string, signal?: AbortSignal, prefixBytes?: number): Promise<string>;
     resource(uri: string, record_ref: string, allowedRoots: readonly string[], media_type?: string): Promise<string>;
     close(): Promise<void>;
     finish(): Promise<CaptureResult>;
@@ -29,3 +29,5 @@ export declare function importArchive(input: string, destination: string, signal
     maxBytes: number;
     maxEntries: number;
 }): Promise<CaptureResult>;
+export declare function importArchives(input: string, destination: string, signal: AbortSignal): Promise<CaptureResult[]>;
+export declare function exportArchives(roots: string[], destination: string): Promise<void>;

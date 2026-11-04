@@ -68,8 +68,7 @@ it('marks unresolved Codex history and rejects missing archival status', async (
   await jsonl(file, [{ type: 'session_meta', payload: { id: 'live', history_base: { session_id: 'missing' } } }, { type: 'compacted', content: 'summary' }]);
   const registry = new SourceRegistry({ codex });
   const source = (await registry.sessions('codex')).items[0];
-  const capture = await registry.capture(source.sourceId, path.join(root, 'capture'));
-  expect((await readManifest(capture.archivePath)).issues.map(x => x.code)).toContain('unresolved_history');
+  await expect(registry.capture(source.sourceId, path.join(root, 'capture'))).rejects.toMatchObject({ code: 'SOURCE_HISTORY_MISSING' });
   await expect(registry.sessions('codex', { limit: 101 })).rejects.toThrow();
   await expect(registry.capture('../../private', path.join(root, 'bad'))).rejects.toThrow();
 });
@@ -115,4 +114,51 @@ it('WorkBuddy missing, empty and unrecognized status values are not active', asy
   } db.close(); const registry = new SourceRegistry({workbuddy:wb});
   expect((await registry.sessions('workbuddy')).items.map(x=>x.nativeId)).toEqual(['valid']);
   await expect(registry.assertActive(sourceKey('workbuddy',wb,'null'))).rejects.toMatchObject({code:'SOURCE_INACTIVE'});
+});
+
+it('reconstructs paginated Codex dialogue to the exact history cutoff and permits context compaction', async () => {
+  const root = await temp(), codex = path.join(root, 'codex'), id = '00000000-0000-4000-8000-000000000001';
+  await mkdir(codex);
+  const previous = path.join(codex, 'sessions/old/rollout-' + id + '.jsonl');
+  const current = path.join(codex, 'sessions/new/rollout-' + id + '.jsonl');
+  const message = (role: string, text: string) => ({ type: 'response_item', payload: { type: 'message', role, content: [{ type: 'input_text', text }] } });
+  const prefix = [{ type: 'session_meta', payload: { id } }, message('user', 'earlier question'), message('assistant', 'earlier answer')];
+  const bytes = Buffer.byteLength(prefix.map(row => JSON.stringify(row)).join('\n') + '\n');
+  await jsonl(previous, [...prefix, message('user', 'beyond the fork cutoff')]);
+  await jsonl(current, [{ type: 'session_meta', payload: { id, history_mode: 'paginated', history_base: { thread_id: id, end_byte_offset: bytes, end_ordinal_exclusive: prefix.length } } },
+    { type: 'compacted', message: 'private model summary' }, message('user', 'current question'), message('assistant', 'current answer')]);
+  const db = new DatabaseSync(path.join(codex, 'state_5.sqlite'));
+  db.exec('CREATE TABLE threads(id TEXT,title TEXT,cwd TEXT,rollout_path TEXT,archived INTEGER)');
+  db.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id, 'Paged', root, current, 0); db.close();
+  const registry = new SourceRegistry({ codex });
+  const capture = await registry.capture((await registry.sessions('codex')).items[0].sourceId, path.join(root, 'capture'));
+  const { buildMigrationPlan } = await import('../../src/mapping.js');
+  const plan = await buildMigrationPlan(capture.archivePath, { cwd: root, agentPreset: 'standard' });
+  expect(plan.report.counts.blocked).toBe(0);
+  expect(plan.messages.flatMap(m => m.content.map(b => b.type === 'text' ? b.text : ''))).toEqual(['earlier question', 'earlier answer', 'current question', 'current answer']);
+  const manifest = await readManifest(capture.archivePath);
+  for (const file of manifest.original_files) expect(await readFile(path.join(capture.archivePath, file.path), 'utf8')).not.toContain('beyond the fork cutoff');
+});
+
+it('recovers inherited dialogue from the native index when the prior rollout is no longer on disk', async () => {
+  const root = await temp(), codex = path.join(root, 'codex'), parent = '00000000-0000-4000-8000-000000000001', id = '00000000-0000-4000-8000-000000000002';
+  await mkdir(codex); const file = path.join(codex, 'sessions/rollout-' + id + '.jsonl');
+  await jsonl(file, [{ type: 'session_meta', payload: { id, history_base: { thread_id: parent, end_byte_offset: 1000, end_ordinal_exclusive: 10 } } }, { type: 'response_item', payload: { type: 'message', role: 'user', content: 'current question' } }]);
+  const db = new DatabaseSync(path.join(codex, 'state_5.sqlite'));
+  db.exec('CREATE TABLE threads(id TEXT,title TEXT,cwd TEXT,rollout_path TEXT,archived INTEGER)');
+  db.prepare('INSERT INTO threads VALUES (?,?,?,?,?)').run(id, 'Inherited', root, file, 0); db.close();
+  const index = new DatabaseSync(path.join(codex, 'thread_history_1.sqlite'));
+  index.exec('CREATE TABLE thread_items(thread_id TEXT,item_id TEXT,rollout_ordinal INTEGER,updated_at_ordinal INTEGER,item_type TEXT,item_json TEXT,created_at_ms INTEGER)');
+  for (const [ordinal, updated, type, data] of [
+    [1, 1, 'userMessage', { content: [{ type: 'text', text: 'indexed question' }] }],
+    [2, 2, 'agentMessage', { text: 'indexed answer' }],
+    [3, 3, 'commandExecution', { aggregatedOutput: 'tool output' }],
+    [4, 11, 'agentMessage', { text: 'answer changed after the cutoff' }],
+  ] as const) index.prepare('INSERT INTO thread_items VALUES (?,?,?,?,?,?,?)').run(parent, String(ordinal), ordinal, updated, type, JSON.stringify(data), 1);
+  index.close();
+  const registry = new SourceRegistry({ codex }), capture = await registry.capture((await registry.sessions('codex')).items[0].sourceId, path.join(root, 'capture'));
+  const { buildMigrationPlan } = await import('../../src/mapping.js');
+  const plan = await buildMigrationPlan(capture.archivePath, { cwd: root, agentPreset: 'standard' });
+  expect(plan.messages.flatMap(m => m.content.map(b => b.type === 'text' ? b.text : ''))).toEqual(['indexed question', 'indexed answer', 'current question']);
+  expect(plan.report.counts.blocked).toBe(0);
 });

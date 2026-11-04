@@ -18,13 +18,14 @@ test('a killed writer exposes recovery in the UI and archived sources still cann
   const rpc=async (name:string,payload:unknown={})=>(await page.request.post(endpoint,{data:{endpoint:name,payload},headers:{Origin:new URL(url).origin}})).json();
   const list=await rpc('sessions',{app:'workbuddy'}), source=list.value.items.find((s:{nativeId:string})=>s.nativeId==='recovery');
   const preview=(await rpc('preview',{sourceId:source.sourceId,target:{cwd:root,agentPreset:'standard'}})).value;
-  const key=createHash('sha256').update(JSON.stringify({snapshot:preview.snapshotDigest,target:preview.target,mapping:'1',namespace:root})).digest('hex');
+  const key=createHash('sha256').update(JSON.stringify({snapshot:preview.snapshotDigest,target:preview.target,mapping:'2',namespace:root})).digest('hex');
   const resultFile=path.join(root,'crash-reservation.json');
   const child=spawn(process.execPath,[path.join(root,'crash-reservation.mjs'),path.join(root,'link-data/operations.sqlite'),preview.previewId,key,resultFile],{stdio:'pipe'});
   const [code,signal]=await once(child,'exit');expect(code).toBeNull();expect(signal).toBe('SIGKILL');
   const reserved=JSON.parse(await readFile(resultFile,'utf8'));
   try {
     await page.getByRole('button',{name:'Alink',exact:true}).click();
+    await page.getByRole('button',{name:'迁移记录',exact:true}).click();
     const row=page.getByRole('region',{name:'迁移记录'}).locator('article').filter({has:page.getByText('恢复入口验收',{exact:true})}).first();
     await expect(row.getByText('需要核对',{exact:true})).toBeVisible();
     await expect(row.getByRole('button',{name:'重新核对并重试'})).toBeEnabled();

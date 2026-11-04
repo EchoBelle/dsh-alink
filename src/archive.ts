@@ -9,7 +9,7 @@ import { Transform } from 'node:stream';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import yauzl from 'yauzl';
 import yazl from 'yazl';
-import { readJsonl, encode, snapshotFile, MAX_ARCHIVE_BYTES } from './sources/jsonl.js';
+import { readJsonl, encode, snapshotFile, snapshotPrefix, MAX_ARCHIVE_BYTES } from './sources/jsonl.js';
 import type { ArchiveManifest, CaptureResult, ObjectRef, PortableEvent, PortableResource, SourceApp } from './contracts.js';
 
 export async function fileHash(file: string): Promise<string> {
@@ -79,9 +79,10 @@ export class ArchiveBuilder {
     if (this.bytes > this.maxBytes) throw new Error('Archive exceeds size limit');
     return ref;
   }
-  async objectFile(file: string, signal?: AbortSignal): Promise<ObjectRef> {
+  async objectFile(file: string, signal?: AbortSignal, prefixBytes?: number): Promise<ObjectRef> {
     const temporary = path.join(this.root, 'objects', randomUUID());
-    await snapshotFile(file, temporary, this.maxBytes - this.bytes, signal);
+    if (prefixBytes === undefined) await snapshotFile(file, temporary, this.maxBytes - this.bytes, signal);
+    else { if (prefixBytes > this.maxBytes - this.bytes) throw new Error('Archive exceeds size limit'); await snapshotPrefix(file, temporary, prefixBytes, signal); }
     const sha256 = await fileHash(temporary), size = (await stat(temporary)).size;
     const destination = path.join(this.root, 'objects', sha256);
     try { await lstat(destination); await rm(temporary); }
@@ -91,8 +92,8 @@ export class ArchiveBuilder {
     }
     return { sha256, size, path: 'objects/' + sha256 };
   }
-  async originalFile(file: string, name = path.basename(file), signal?: AbortSignal): Promise<string> {
-    const obj = await this.objectFile(file, signal);
+  async originalFile(file: string, name = path.basename(file), signal?: AbortSignal, prefixBytes?: number): Promise<string> {
+    const obj = await this.objectFile(file, signal, prefixBytes);
     this.manifest.original_files.push({ ...obj, name });
     return path.join(this.root, obj.path);
   }
@@ -200,7 +201,7 @@ export async function exportArchive(root: string, destination: string): Promise<
   const pending = pipeline(zip.outputStream, createWriteStream(destination, { flags: 'wx', mode: 0o600 }));
   zip.end(); await pending;
 }
-export async function importArchive(input: string, destination: string, signal: AbortSignal, limits = { maxBytes: MAX_ARCHIVE_BYTES, maxEntries: 100000 }): Promise<CaptureResult> {
+async function unpackArchive(input: string, destination: string, signal: AbortSignal, limits = { maxBytes: MAX_ARCHIVE_BYTES, maxEntries: 100000 }): Promise<void> {
   signal.throwIfAborted();
   if ((await stat(input)).isDirectory()) {
     await validateArchive(input);
@@ -253,9 +254,54 @@ export async function importArchive(input: string, destination: string, signal: 
       });
     } finally { zip.close(); }
   }
+}
+
+export async function importArchive(input: string, destination: string, signal: AbortSignal, limits = { maxBytes: MAX_ARCHIVE_BYTES, maxEntries: 100000 }): Promise<CaptureResult> {
+  await unpackArchive(input, destination, signal, limits);
   let root = destination;
   try { await stat(path.join(root, 'manifest.json')); }
   catch { root = path.join(destination, 'original.alink'); }
   await validateArchive(root);
   return { archivePath: root, snapshotDigest: await archiveDigest(root) };
+}
+
+export async function importArchives(input: string, destination: string, signal: AbortSignal): Promise<CaptureResult[]> {
+  await unpackArchive(input, destination, signal);
+  const collection = path.join(destination, 'collection.json');
+  if (!await stat(collection).catch(() => undefined)) {
+    const root = await stat(path.join(destination, 'manifest.json')).catch(() => undefined) ? destination : path.join(destination, 'original.alink');
+    await validateArchive(root); return [{ archivePath: root, snapshotDigest: await archiveDigest(root) }];
+  }
+  if ((await stat(collection)).size > 65536 || await stat(path.join(destination, 'manifest.json')).catch(() => undefined)) throw new Error('Invalid collection');
+  const value = JSON.parse(await readFile(collection, 'utf8'));
+  if (value.format !== 'alink.collection' || value.version !== '0.1.0' || !Array.isArray(value.sessions) || !value.sessions.length || value.sessions.length > 100 || new Set(value.sessions).size !== value.sessions.length) throw new Error('Invalid collection');
+  const results: CaptureResult[] = [];
+  for (const name of value.sessions) {
+    signal.throwIfAborted();
+    if (typeof name !== 'string' || !/^sessions\/[a-f0-9-]{36}$/.test(name)) throw new Error('Unsafe collection path');
+    const root = path.join(destination, name); await validateArchive(root);
+    results.push({ archivePath: root, snapshotDigest: await archiveDigest(root) });
+  }
+  return results;
+}
+
+export async function exportArchives(roots: string[], destination: string): Promise<void> {
+  if (roots.length === 1) return exportArchive(roots[0], destination);
+  if (!roots.length || roots.length > 100) throw new Error('Invalid collection size');
+  const zip = new yazl.ZipFile(), sessions: string[] = [];
+  let bytes = 0, entries = 1;
+  for (const root of roots) {
+    await validateArchive(root);
+    const prefix = 'sessions/' + randomUUID(); sessions.push(prefix);
+    const manifest = await readManifest(root);
+    const files = new Set(['manifest.json', 'events.jsonl', 'records.jsonl', ...[...manifest.resources, ...manifest.original_files].flatMap(r => r.path ? [r.path] : [])]);
+    for (const name of files) {
+      bytes += (await stat(path.join(root, name))).size;
+      if (bytes > MAX_ARCHIVE_BYTES - 65536 || ++entries > 100000) throw new Error('Archive exceeds size limit');
+      zip.addFile(path.join(root, name), prefix + '/' + name, { mode: 0o100600 });
+    }
+  }
+  zip.addBuffer(Buffer.from(JSON.stringify({ format: 'alink.collection', version: '0.1.0', sessions })), 'collection.json');
+  const pending = pipeline(zip.outputStream, createWriteStream(destination, { flags: 'wx', mode: 0o600 }));
+  zip.end(); await pending;
 }

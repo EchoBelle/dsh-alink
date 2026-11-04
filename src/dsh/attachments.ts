@@ -26,26 +26,28 @@ export async function validatePlannedImages(plan: MigrationPlan, store: Attachme
     catch (error) {
       if (error instanceof LinkError && error.code !== 'IMAGE_NOT_ADMITTED') throw error;
       if (!(error instanceof LinkError) && !store.isAttachmentError(error)) throw error;
-      for (const m of plan.messages) m.content = m.content.map(b => b.type === 'resource' && b.resourceId === resource.id ? { type: 'text', text: `[历史图片未迁入：${name(resource)}；目标不支持该图片]` } : b);
+      for (const m of plan.messages) m.content = m.content.filter(b => b.type !== 'resource' || b.resourceId !== resource.id);
       plan.report.issues = plan.report.issues.filter(i => !(i.resourceId === resource.id && i.code === 'attachment'));
       plan.report.issues.push({ code: 'image_not_admitted', disposition: 'archive-only', resourceId: resource.id, detail: '目标图片限制或编码校验未通过，原图保留在备份中' });
     }
   }
   for (const message of plan.messages) {
     let count = 0, bytes = 0;
-    message.content = message.content.map(block => {
-      if (block.type !== 'resource') return block;
+    message.content = message.content.filter(block => {
+      if (block.type !== 'resource') return true;
       const resource = plan.resources.find(r => r.id === block.resourceId)!;
-      if (!imageType(resource)) return block;
+      if (!imageType(resource)) return true;
       if (count >= store.imageLimits.maxImagesPerMessage || bytes + resource.size! > store.imageLimits.maxMessageImageBytes) {
         const existing = plan.report.issues.findLastIndex(i => i.code === 'attachment' && i.resourceId === resource.id && i.recordRef === message.recordRef);
         if (existing >= 0) plan.report.issues.splice(existing, 1);
         plan.report.issues.push({ code: 'message_image_limit', disposition: 'archive-only', recordRef: message.recordRef, resourceId: resource.id, detail: '超过目标单条消息图片上限，原图保留在备份中' });
-        return { type: 'text', text: `[历史图片未迁入：${name(resource)}；超过单条消息图片上限]` };
+        return false;
       }
-      count++; bytes += resource.size!; return block;
+      count++; bytes += resource.size!; return true;
     });
   }
+  plan.messages = plan.messages.filter(message => message.content.length > 0);
+  if (!plan.messages.length && !plan.report.issues.some(i => i.code === 'empty_history')) plan.report.issues.push({ code: 'empty_history', disposition: 'blocked', detail: '没有可迁入的对话内容' });
   refreshReport(plan);
 }
 export async function admitResources(plan: MigrationPlan, store: AttachmentStore, signal?: AbortSignal): Promise<AdmittedResources> {

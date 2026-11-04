@@ -101,7 +101,7 @@ export interface MigrationIssue {
     detail: string;
 }
 export interface MappingReport {
-    mappingVersion: '1';
+    mappingVersion: '1' | '2';
     issues: MigrationIssue[];
     counts: Record<IssueDisposition, number>;
     reportHash: string;
@@ -121,9 +121,38 @@ export interface Operation {
     stage: string;
     errorCode?: string;
     title: string;
+    hidden?: boolean;
+    outdated?: boolean;
 }
 export interface CommitRequest {
     previewId: string;
     reportHash: string;
     requestId: string;
+}
+export interface TransferItem {
+    sourceId: string;
+    title: string;
+    state: 'pending' | 'running' | 'completed' | 'failed' | 'canceled';
+    operationId?: string;
+    errorCode?: string;
+    warning?: string;
+}
+export interface Transfer {
+    id: string;
+    kind: 'import' | 'export';
+    state: 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'canceled';
+    items: TransferItem[];
+    createdAt: number;
+    downloadable?: boolean;
+    errorCode?: string;
+}
+export interface TransferRequest {
+    requestId: string;
+    kind: 'import' | 'export';
+    sourceIds: string[];
+    titles?: Record<string, string>;
+    target?: {
+        cwd?: string;
+        agentPreset: string;
+    };
 }
