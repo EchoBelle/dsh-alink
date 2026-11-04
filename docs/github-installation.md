@@ -21,7 +21,7 @@ dsh web
 - 5 条迁入会话重启后分别续聊成功；卸载插件后再次分别续聊成功。10 次请求均使用本地测试模型，结果落盘并重新读取通过。
 - 重命名后 28 项单元测试、14 项集成测试和 TypeScript 检查通过。
 
-完整流程验证的提交为 [`1447d7c088a822de3e0d7c29cc1e371553cc5bb8`](https://github.com/EchoBelle/dsh-alink/commit/1447d7c088a822de3e0d7c29cc1e371553cc5bb8)。后续标签提交仅更新验证文档，运行产物不变。
+完整流程验证的提交为 [`1447d7c088a822de3e0d7c29cc1e371553cc5bb8`](https://github.com/EchoBelle/dsh-alink/commit/1447d7c088a822de3e0d7c29cc1e371553cc5bb8)。后续标签提交仅更新验证文档，运行产物不变。`v0.1.0` 标签随后也通过同样的完整流程复测：7 项浏览器测试、5 次重启续聊、5 次卸载后续聊全部通过。
 
 ## 复现
 
