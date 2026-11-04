@@ -12,12 +12,11 @@ dsh-alink 是原生 TypeScript 插件，提供 DSH 内的“Alink”面板。它
 
 ```sh
 npm install -g @deepseek-ai/dsh@0.2.1-rc.5
-dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.1
+dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.2
 dsh --profile web --dump-config
 dsh web
 ```
 
-DSH 0.2.1-rc.5 的界面“添加插件”目前有工作区安装参数缺失的问题，可能报 `ERR_PNPM_ADDING_TO_ROOT`。上面的 `dsh plugin` 命令明确指定安装目标，可直接使用，不需要逐个用户修改设置。已提供 [DSH 安装器修复补丁](https://github.com/EchoBelle/dsh-alink/tree/main/patches)，待上游采用后才能承诺原版 DSH 的界面直装。
 
 首次创建 Web profile 时，可先运行 `dsh --profile web --dump-config`。安装绑定到所选 profile；建议固定版本标签或完整提交 SHA。测试使用独立 `DSH_HOME`。
 

@@ -51,6 +51,6 @@ test('groups projects, shows only dialogue and keeps long content inside both la
       });
       return noOverlap && contained && selects && root.scrollWidth <= root.clientWidth + 1;
     })).toBe(true);
-    await page.screenshot({ path: `.local/verification/alink-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `.local/verification/alink-${width}.png` });
   }
 });

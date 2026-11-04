@@ -4,17 +4,11 @@
 
 ```sh
 dsh --profile web --dump-config
-dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.1
+dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.2
 dsh web
 ```
 
 仓库跟踪源码和预构建 lib，GitHub 安装不执行 prepare/prepack 构建。修改源码后须运行 build 并提交对应 lib。
-
-## 界面安装
-
-官方 DSH 0.2.1-rc.5 的“添加插件”在全新 profile 上会报 `ERR_PNPM_ADDING_TO_ROOT`，失败发生在插件解析之前。Alink 的 GitHub 地址和预构建包本身可通过上面的单条 DSH 命令安装。其他用户无需修改设置。
-
-DSH 安装器的最小修复及回归入口见 [补丁说明](../patches/README.md)。目前不能把“修复后安装器的界面验收”描述为“官方原版已支持界面安装”。
 
 ## 0.1.0 的历史验收
 
@@ -37,7 +31,7 @@ pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
-node scripts/release-smoke.mjs github:EchoBelle/dsh-alink#v0.1.1
+node scripts/release-smoke.mjs github:EchoBelle/dsh-alink#v0.1.2
 ```
 
 需要本机 Google Chrome。验收使用合成来源和本地测试模型，不迁移日常会话，不发起真实模型请求。结果保存在 .local/releases/latest-smoke.json，日志位于 .local/verification。

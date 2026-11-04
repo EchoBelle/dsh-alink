@@ -11,7 +11,7 @@ export function conversationMessages(plan: MigrationPlan) {
   return plan.messages.flatMap(message => {
     if (message.presentation === 'context' || (message.presentation === undefined && toolRecords.has(message.recordRef))) return [];
     const content = message.content.filter(b => b.type === 'text' && b.text.trim()
-      && !isHarnessContext(b.text) && !/^\[(?:从 .+ 导入的历史产物|历史资源未迁入：)/.test(b.text));
+      && !(message.role === 'user' && isHarnessContext(b.text)) && !/^\[(?:从 .+ 导入的历史产物|历史资源未迁入：)/.test(b.text));
     return content.length ? [{ role: message.role, content }] : [];
   });
 }
