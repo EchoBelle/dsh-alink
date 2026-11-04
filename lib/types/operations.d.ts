@@ -49,8 +49,6 @@ export declare class MigrationService {
                 text: string;
             })[];
             role: "user" | "assistant";
-            recordRef: string;
-            timestamp?: number;
         }[];
         preview?: Preview | undefined;
     };

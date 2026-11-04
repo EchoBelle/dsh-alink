@@ -13,6 +13,7 @@ export interface PlannedMessage {
     content: PlannedBlock[];
     recordRef: string;
     timestamp?: number;
+    presentation?: 'conversation' | 'context';
 }
 export interface MigrationPlan {
     archivePath: string;

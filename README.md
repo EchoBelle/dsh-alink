@@ -2,7 +2,7 @@
 
 将 **当前有效、未归档** 的 WorkBuddy、Codex、小浣熊和 Cursor 会话迁入 DeepSeek Harness，并在 DSH 中继续对话。
 
-dsh-alink 是原生 TypeScript 插件，提供 DSH 内的“会话迁移”面板。它不启动独立应用或 Python 服务。导入新增独立会话，来源数据保持只读。
+dsh-alink 是原生 TypeScript 插件，提供 DSH 内的“Alink”面板。它不启动独立应用或 Python 服务。导入新增独立会话，来源数据保持只读。
 
 ## 版本与安装
 
@@ -12,10 +12,12 @@ dsh-alink 是原生 TypeScript 插件，提供 DSH 内的“会话迁移”面�
 
 ```sh
 npm install -g @deepseek-ai/dsh@0.2.1-rc.5
-dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.0
+dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.1
 dsh --profile web --dump-config
 dsh web
 ```
+
+DSH 0.2.1-rc.5 的界面“添加插件”目前有工作区安装参数缺失的问题，可能报 `ERR_PNPM_ADDING_TO_ROOT`。上面的 `dsh plugin` 命令明确指定安装目标，可直接使用，不需要逐个用户修改设置。已提供 [DSH 安装器修复补丁](https://github.com/EchoBelle/dsh-alink/tree/main/patches)，待上游采用后才能承诺原版 DSH 的界面直装。
 
 首次创建 Web profile 时，可先运行 `dsh --profile web --dump-config`。安装绑定到所选 profile；建议固定版本标签或完整提交 SHA。测试使用独立 `DSH_HOME`。
 
@@ -23,10 +25,10 @@ dsh web
 
 ## 使用
 
-1. 在 DSH 侧栏打开“会话迁移”，选择来源应用和一条会话。
+1. 在 DSH 侧栏打开“Alink”，选择来源应用，按项目展开并选择会话。
 2. 选择已存在的目标项目目录及 DSH 配置，点击“生成迁移预览”。
-3. 检查正文、附件和差异；确认后迁入。
-4. 在迁移记录中打开原生会话、查看报告或下载原始备份。
+3. 查看用户与助手的对话正文，确认后迁入。
+4. 在迁移记录中打开原生会话、查看对话或下载原始备份。
 
 **归档规则贯穿整个流程**：发现时排除已归档、已删除和状态不明的会话；捕获前后、提交时、附件处理后再次核实。预览后被归档的会话不能迁入。备份导入也必须关联到原应用中仍可核实为有效的会话，不能用旧备份绕过此规则。
 
@@ -42,6 +44,8 @@ dsh web
 | 系统/开发者提示、推理和私有卡片 | 仅保存在原始备份，不变成 DSH 当前运行指令 |
 | 隐藏或失效消息 | 仅保存在备份，不恢复为活动上下文 |
 | 未解析的分支、压缩或外部历史 | 阻止可继续会话导入，报告具体缺口 |
+
+Alink 的对话预览仅显示用户与助手的正文，隐藏工具日志、自动注入的规则/环境说明及生成的附件说明；原始记录与迁入所需上下文仍保留。
 
 DSH 的轮次和流式展示是重建结构，不代表来源真实执行过程。迁移本身不调用模型；继续对话由 DSH 当前模型、工具和权限设置处理。
 

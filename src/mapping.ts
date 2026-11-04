@@ -6,7 +6,7 @@ import { createImportedHistory, digest, type FrozenHistory } from './dsh/history
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import { LinkError } from './transport.js';
 export type PlannedBlock = { type: 'text'; text: string } | { type: 'resource'; resourceId: string };
-export interface PlannedMessage { role: 'user' | 'assistant'; content: PlannedBlock[]; recordRef: string; timestamp?: number }
+export interface PlannedMessage { role: 'user' | 'assistant'; content: PlannedBlock[]; recordRef: string; timestamp?: number; presentation?: 'conversation' | 'context' }
 export interface MigrationPlan {
   archivePath: string; snapshotDigest: string; sourceApp: string; title: string; createdAt: number; target: TargetSelection;
   messages: PlannedMessage[]; resources: PortableResource[]; report: MappingReport;
@@ -60,9 +60,9 @@ export async function buildMigrationPlan(archivePath: string, target: TargetSele
           }
         } else issue('archive-only', 'unsupported_block', '不支持的内容块保留在备份中', e);
       }
-      if (content.length) { add({ role: e.role === 'user' ? 'user' : 'assistant', content, recordRef: e.record_ref, ...time }); issue('native', 'message', '正文保持原文', e); }
+      if (content.length) { add({ role: e.role === 'user' ? 'user' : 'assistant', content, recordRef: e.record_ref, presentation: e.kind === 'message' ? 'conversation' : 'context', ...time }); issue('native', 'message', '正文保持原文', e); }
       if (attachmentContext.length) {
-        add({ role: 'user', content: [{ type: 'text', text: `[从 ${plan.sourceApp} 导入的历史产物]` }, ...attachmentContext], recordRef: e.record_ref, ...time });
+        add({ role: 'user', content: [{ type: 'text', text: `[从 ${plan.sourceApp} 导入的历史产物]` }, ...attachmentContext], recordRef: e.record_ref, presentation: 'context', ...time });
         issue('rendered', 'artifact_context', '附件以明确标注的历史上下文关联，原助手正文保持不变', e);
       }
     } else if (e.kind === 'tool_call' || e.kind === 'tool_result') {
@@ -72,7 +72,7 @@ export async function buildMigrationPlan(archivePath: string, target: TargetSele
         else if (b.type === 'tool_result') { lines.push(`调用：${b.call_id ?? ''}`, `结果：${typeof b.output === 'string' ? b.output : encode(b.output)}`); if (b.status !== undefined) lines.push(`状态：${String(b.status)}`); if (!calls.has(String(b.call_id))) lines.push('来源未提供对应调用。'); }
         else lines.push(b.type === 'text' ? String(b.text ?? '') : encode(b));
       }
-      add({ role: 'assistant', content: [{ type: 'text', text: lines.join('\n') }], recordRef: e.record_ref, ...time }); issue('rendered', 'tool_history', '作为可读历史，不注册或执行来源工具', e);
+      add({ role: 'assistant', content: [{ type: 'text', text: lines.join('\n') }], recordRef: e.record_ref, presentation: 'context', ...time }); issue('rendered', 'tool_history', '作为可读历史，不注册或执行来源工具', e);
     } else issue('archive-only', 'unsupported_event', '来源角色或私有事件仅保留在备份中', e);
   }
   for (const resource of manifest.resources) if (!used.has(resource.id)) issue('archive-only', 'unmapped_resource', '未关联到活动消息的资源保留在备份', undefined, resource.id);

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, copyFile } from 'node:fs/promises';
 import { createWriteStream } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,12 +11,19 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { createSources } from '../tests-ts/helpers/fixtures.mjs';
-const project = path.resolve('.'), requested = process.argv[2] || '.local/releases/dsh-alink-0.1.0.tgz';
+const project = path.resolve('.');
+const pkg = JSON.parse(await readFile(path.join(project, 'package.json'), 'utf8'));
+const requested = process.argv[2] || `.local/releases/${pkg.name}-${pkg.version}.tgz`;
 const fromGit = requested.startsWith('github:');
+const uiInstall = process.argv.includes('--ui');
 const packageFile = fromGit ? requested : path.resolve(requested);
 const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-alink-release-'));
+const managerFix = process.env.DSH_ALINK_TEST_MANAGER ? path.join(home, 'plugin-manager-fixed.mjs') : undefined;
+if (managerFix) await copyFile(process.env.DSH_ALINK_TEST_MANAGER, managerFix);
 const cli = process.env.DSH_ALINK_TEST_CLI || path.join(project, 'node_modules/@deepseek-ai/dsh/lib/bin.js');
 const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, LANG: 'en_US.UTF-8', DSH_HOME: home };
+const baseOverlay = ['- id: session-log-deepseek\n  disabled: true','- id: session-telemetry-otel\n  disabled: true','- id: desktop-product-telemetry\n  disabled: true','- id: product-analytics\n  disabled: true',
+  ...(managerFix ? [`- id: plugin-manager\n  disabled: true`, `- insert:\n    - id: plugin-manager-fixed\n      name: ${JSON.stringify(managerFix)}`] : [])];
 const evidence = path.join(project, '.local/verification');
 await mkdir(evidence, { recursive: true });
 await mkdir(path.join(project, '.local/releases'), { recursive: true });
@@ -64,7 +71,6 @@ async function continuation(round,ids) {
 try {
   await save('Preparing clean DSH home');
   summary.dshVersion = (await run(process.execPath, [cli, '--version'])).trim();
-  const pkg=JSON.parse(await readFile(path.join(project,'package.json'),'utf8'));
   await writeFile(path.join(home,'package.json'),JSON.stringify({name:'dsh-alink-release-fixture',private:true,type:'module',peerDependencies:pkg.peerDependencies}));
   await writeFile(path.join(home,'.dsh-alink-test'),'synthetic data only');
   const roots=await createSources(home);
@@ -72,8 +78,17 @@ try {
   await build({entryPoints:[path.join(project,'tests-ts/helpers/package-probe.ts')],outfile:path.join(home,'package-probe.mjs'),bundle:true,platform:'node',format:'esm',packages:'external',plugins:[{name:'test-host-sdk',setup(builder){builder.onResolve({filter:/^@deepseek-ai\//},args=>({path:pathToFileURL(createRequire(import.meta.url).resolve(args.path)).href,external:true}));}}]});
   await run(process.execPath,[cli,'--profile','web','--dump-config'],{log:'release-default-config.log'});
   await writeFile(path.join(home,'profiles/web/.npmrc'),'store-dir=/tmp/dsh-alink-pnpm-store\n');
-  await save('Installing plugin through dsh plugin into clean profile');
-  await run(process.execPath,[cli,'plugin','--profile','web','add','--workspace-root',packageFile],{log:'release-install.log'});
+  if (uiInstall) {
+    await writeFile(path.join(home,'web.patch.yml'),baseOverlay.join('\n')+'\n');
+    await start('installer'); await save('Installing through the native Add plugin dialog');
+    await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/plugin-install.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_INSTALL_SPEC:packageFile},log:'release-ui-install.log'});
+    await stop();
+  } else {
+    await save('Installing plugin through dsh plugin into clean profile');
+    await run(process.execPath,[cli,'plugin','--profile','web','add','--workspace-root',packageFile],{log:'release-install.log'});
+  }
+  summary.installMethod = uiInstall ? 'native-ui' : 'cli';
+  summary.installerPatched = !!process.env.DSH_ALINK_TEST_MANAGER;
   const manifest=JSON.parse(await readFile(path.join(home,'profiles/web/package.json'),'utf8'));
   const dependency = String(manifest.dependencies?.['dsh-alink']);
   if (!manifest.dsh.profile.bundles.includes('dsh-alink') || dependency.startsWith('link:') || (fromGit ? !/github|codeload/.test(dependency) : !dependency.startsWith('file:'))) throw new Error('Profile must install the requested remote or packed dependency, not a source link');
@@ -83,12 +98,12 @@ try {
     if (createHash('sha256').update(await readFile(path.join(installedRoot, file))).digest('hex') !== createHash('sha256').update(await readFile(path.join(project, file))).digest('hex')) throw new Error('Installed artifact differs: ' + file);
   }
   await writeFile(path.join(home,'web.patch.yml'),[
-    '- id: session-log-deepseek\n  disabled: true','- id: session-telemetry-otel\n  disabled: true','- id: desktop-product-telemetry\n  disabled: true','- id: product-analytics\n  disabled: true',
+    ...baseOverlay,
     `- insert:\n    - id: package-probe\n      name: ${JSON.stringify(path.join(home,'package-probe.mjs'))}`,
     `- id: dsh-alink\n  config:\n    dataDir: ${JSON.stringify(path.join(home,'link-data'))}\n    sourceRoots:\n${Object.entries(roots).map(([key,value])=>'      '+key+': '+JSON.stringify(value)).join('\n')}`,
   ].join('\n')+'\n');
   await start('import');await save('Testing four source applications through native UI');
-  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/all-sources.spec.ts','tests-ts/e2e/archive-guard.spec.ts','tests-ts/e2e/recovery-ui.spec.ts','tests-ts/e2e/plugin-shell.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_PACKAGE_MATRIX:'1'},log:'release-browser.log'});
+  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/all-sources.spec.ts','tests-ts/e2e/archive-guard.spec.ts','tests-ts/e2e/recovery-ui.spec.ts','tests-ts/e2e/plugin-shell.spec.ts','tests-ts/e2e/presentation.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_PACKAGE_MATRIX:'1'},log:'release-browser.log'});
   await stop();
   const db=new DatabaseSync(path.join(home,'link-data/operations.sqlite'),{readOnly:true});
   const ops=db.prepare('SELECT value FROM operations').all().map(row=>JSON.parse(row.value));db.close();

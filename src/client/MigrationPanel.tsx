@@ -9,16 +9,6 @@ interface Message { role: string; content: Array<{ type: string; text?: string; 
 interface PreviewPage { preview?: Preview; items: Message[]; total: number; offset: number }
 const names: Record<string, string> = { workbuddy: 'WorkBuddy', codex: 'Codex', raccoon: '小浣熊', cursor: 'Cursor', dsh: 'DSH' };
 const states: Record<string, string> = { prepared: '排队中', writing: '迁入中', verifying: '核对中', completed: '迁移完成', failed: '迁移失败', canceled: '已取消', 'needs-attention': '需要核对' };
-const labels: Record<string, string> = { native: '原生迁入', rendered: '历史说明', 'archive-only': '仅保留备份', missing: '资源缺失', blocked: '需要处理' };
-const issueCopy: Record<string, string> = {
-  tool_history: '工具参数与结果转成历史说明，不执行工具。', inactive_or_auxiliary: '隐藏、旧版本和辅助记录只保留在备份中。',
-  unsupported_event: '来源私有内容或特殊角色只保留在备份中。', unsupported_block: '不支持的内容块只保留在备份中。',
-  resource_discovery_scope: '只收集可识别且位于允许目录中的资源。', multi_store_snapshot: '日志与索引分别捕获，可能不属于完全相同的时刻。',
-  native_cards: '来源应用的专用卡片保留在原始记录中。', cursor_dependency_closure: '共享资源与跨会话引用未被视为完整收集。',
-  unresolved_history: '无法完整重建有效上下文，需要先处理来源历史。', artifact_context: '历史产物以明确标注的上下文附件关联。',
-  reconstructed_history: 'DSH 的轮次与流式展示由原文重建，不代表来源中的原生执行事件。',
-  reconstructed_stream: '来源未提供可复用的流式记录，DSH 展示结构由正文重建。',
-};
 export function MigrationPanel({ ctx }: { ctx: Context }) {
   const [sources, setSources] = useState<SourceInfo[]>([]), [targets, setTargets] = useState<Targets>({ workspaces: [], presets: [], defaultPreset: '' });
   const [app, setApp] = useState<SourceApp>('workbuddy'), [query, setQuery] = useState('');
@@ -26,7 +16,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
   const [selected, setSelected] = useState<SourceSession>(), [cwd, setCwd] = useState(''), [preset, setPreset] = useState('');
   const [preview, setPreview] = useState<Preview>(), [messages, setMessages] = useState<Message[]>([]), [total, setTotal] = useState(0);
   const [operations, setOperations] = useState<Operation[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false), [loading, setLoading] = useState(false);
-  const [revision, setRevision] = useState(0), [issueLimit, setIssueLimit] = useState(100), [reviewOnly, setReviewOnly] = useState(false);
+  const [revision, setRevision] = useState(0), [reviewOnly, setReviewOnly] = useState(false);
   const [directory, setDirectory] = useState('');
   const requestId = useRef(''), action = useRef<AbortController | undefined>(undefined), mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; action.current?.abort(); }; }, []);
@@ -70,17 +60,12 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
     const value = await call<Preview>('preview', { sourceId: selected.sourceId, target: { cwd, agentPreset: preset } }, signal);
     const page = await call<PreviewPage>('previewPage', { previewId: value.previewId, offset: 0 }, signal);
     if (signal.aborted) return;
-    setPreview(value); setMessages(page.items); setTotal(page.total); setReviewOnly(false); setIssueLimit(100); requestId.current = crypto.randomUUID();
+    setPreview(value); setMessages(page.items); setTotal(page.total); setReviewOnly(false); requestId.current = crypto.randomUUID();
   }
   async function commit(signal: AbortSignal) {
     if (!preview) return;
     const op = await call<Operation>('commit', { previewId: preview.previewId, reportHash: preview.report.reportHash, requestId: requestId.current || (requestId.current = crypto.randomUUID()) }, signal);
     setOperations(old => [op, ...old.filter(o => o.operationId !== op.operationId)]);
-  }
-  function reportDownload() {
-    if (!preview) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(preview, null, 2)], { type: 'application/json' }));
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'dsh-alink-report.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function upload(file: File, signal: AbortSignal) {
     const format = file.name.endsWith('.zip') ? 'alink' : 'dsh';
@@ -88,10 +73,14 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
     const result = await response.json(); if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
     choose(result.value); // choose does not start a migration; source status is checked again at preview and commit.
   }
-  const differences = preview?.report.issues.filter(i => i.disposition !== 'native') ?? [];
+  const projects = new Map<string, SourceSession[]>();
+  for (const session of sessions) {
+    const key = session.cwd || '';
+    const group = projects.get(key) || [];
+    group.push(session); projects.set(key, group);
+  }
   return <section className="dsh-alink">
-    <header className="dsh-alink-header"><div><h1>会话迁移</h1><p>将已有对话带入 DSH，接着完成工作。</p></div><button onClick={() => { invalidate(); setRevision(v => v + 1); }}>刷新来源</button></header>
-    <p className="dsh-alink-note">仅显示未归档且当前有效的会话</p>
+    <header className="dsh-alink-header"><h1>Alink</h1><button onClick={() => { invalidate(); setRevision(v => v + 1); }}>刷新来源</button></header>
     {error && <div className="dsh-alink-error" role="alert">{error}</div>}
     <div className="dsh-alink-columns">
       <aside className="dsh-alink-sources">
@@ -102,7 +91,11 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
         {sources.find(s => s.app === app)?.error && <p className="dsh-alink-note">来源暂时无法读取或存储格式尚未支持。</p>}
         {sources.find(s => s.app === app)?.unknown && <p className="dsh-alink-note">部分会话的归档状态无法核实，已排除。</p>}
         {loading ? <p role="status">正在读取会话列表…</p> : !sessions.length ? <p className="dsh-alink-empty">没有可迁移的有效会话。</p> : <div className="dsh-alink-session-list">
-          {sessions.map(s => <button key={s.sourceId} aria-label={'打开预览：' + s.title} className={selected?.sourceId === s.sourceId ? 'selected' : ''} onClick={() => choose(s)}><strong>{s.title}</strong><small title={s.cwd}>{s.cwd || '未关联本机项目'}</small></button>)}
+          {[...projects].map(([project, items]) => <details key={project} className="dsh-alink-project" open>
+            <summary title={project}><span>{project.split(/[\\/]/).filter(Boolean).at(-1) || '未关联项目'}</span><small>{items.length}</small></summary>
+            {project && <p className="dsh-alink-project-path" title={project}>{project}</p>}
+            <div className="dsh-alink-project-sessions">{items.map(s => <button key={s.sourceId} aria-label={'打开预览：' + s.title} aria-pressed={selected?.sourceId === s.sourceId} className={selected?.sourceId === s.sourceId ? 'selected' : ''} onClick={() => choose(s)}><span>{s.title}</span></button>)}</div>
+          </details>)}
         </div>}
         {cursor && <button onClick={() => void perform(async signal => { const page = await call<{ items: SourceSession[]; nextCursor?: string }>('sessions', { app, text: query, cursor, limit: 50 }, signal); setSessions(old => [...old, ...page.items]); setCursor(page.nextCursor); })}>加载更多会话</button>}
         <details className="dsh-alink-import"><summary>从备份导入</summary><p>备份必须能关联到原应用中仍有效的会话。</p>
@@ -112,16 +105,16 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
         </details>
       </aside>
       <main className="dsh-alink-preview">
-        {!selected && !preview ? <div className="dsh-alink-empty"><h2>选择一条会话</h2><p>先查看内容与迁移差异，再决定是否导入。</p><p>导入会新增独立会话，原应用的数据保持不变。</p></div> : <>
+        {!selected && !preview ? <div className="dsh-alink-empty"><h2>选择一条会话</h2><p>按项目选择会话，预览后迁入 DSH。</p></div> : <>
           {selected && <><h2>{selected.title}</h2><div className="dsh-alink-targets"><label>目标项目目录<input aria-label="目标项目目录" list="dsh-alink-workspaces" value={cwd} onChange={e => { invalidate(); setCwd(e.target.value); }} placeholder="选择或填写已存在的目录" /><datalist id="dsh-alink-workspaces">{targets.workspaces.map(w => <option key={w.id} value={w.path}>{w.title}</option>)}</datalist></label>
             <label>DSH 配置<select aria-label="DSH 配置" value={preset} onChange={e => { invalidate(); setPreset(e.target.value); }}>{targets.presets.map(p => <option key={p.id} value={p.id} disabled={!!p.broken}>{p.name || ({ standard: '标准模式', minimal: '精简模式', cordis: 'Cordis 模式', ptc: 'PTC 模式' } as Record<string, string>)[p.id] || p.id}{p.broken ? '（不可用）' : ''}</option>)}</select></label></div>
             <button className="primary" disabled={busy || !cwd || !preset} onClick={() => void perform(prepare)}>{busy && !preview ? '正在准备…' : '生成迁移预览'}</button></>}
-          {preview && <><div className="dsh-alink-counts">{Object.entries(preview.report.counts).filter(([, n]) => n > 0).map(([key, count]) => <span key={key} className={key === 'blocked' ? 'blocked' : ''}>{labels[key]} <b>{count}</b> 项</span>)}</div>
-            {differences.length > 0 && <details open className="dsh-alink-differences"><summary>迁移差异 · {differences.length} 项</summary><ul>{differences.slice(0, issueLimit).map((i, n) => <li key={n}><b>{labels[i.disposition]}</b> {issueCopy[i.code] || i.detail}</li>)}</ul>{differences.length > issueLimit && <button onClick={() => setIssueLimit(v => v + 100)}>显示更多差异</button>}</details>}
-            <div className="dsh-alink-preview-actions"><span>{total} 条迁入后历史</span><button onClick={reportDownload}>保存报告</button></div>
-            <div className="dsh-alink-messages">{messages.map((m, i) => <article key={i} className={m.role}><small>{m.role === 'user' ? '用户 / 历史上下文' : '助手 / 历史说明'}</small>{m.content.map((b, j) => b.type === 'text' ? <pre key={j}>{b.text}</pre> : <p key={j}>📎 历史附件</p>)}</article>)}</div>
+          {preview && <>
+            {preview.report.counts.blocked > 0 && <p className="dsh-alink-error" role="alert">此会话包含无法完整恢复的历史，暂时无法迁入。</p>}
+            <div className="dsh-alink-preview-actions"><h3>对话历史</h3><span>{total} 条消息</span></div>
+            <div className="dsh-alink-messages" role="region" aria-label="对话历史">{messages.map((m, i) => <article key={i} className={m.role}><small>{m.role === 'user' ? '用户' : '助手'}</small>{m.content.map((b, j) => b.type === 'text' ? <pre key={j}>{b.text}</pre> : null)}</article>)}</div>
             {messages.length < total && <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: preview.previewId, offset: messages.length }, signal); setMessages(old => [...old, ...page.items]); })}>查看更多历史</button>}
-            {!reviewOnly && <div className="dsh-alink-submit"><p>原始记录与资源保留在备份中。工具历史不会被执行。</p><button className="primary" disabled={busy || preview.report.counts.blocked > 0 || active} onClick={() => void perform(commit)}>{preview.report.counts.blocked ? '请先处理来源历史' : differences.length ? '按上述差异导入' : '导入会话'}</button></div>}
+            {!reviewOnly && <div className="dsh-alink-submit"><button className="primary" disabled={busy || preview.report.counts.blocked > 0 || active} onClick={() => void perform(commit)}>{preview.report.counts.blocked ? '暂时无法导入' : '导入会话'}</button></div>}
           </>}
         </>}
       </main>
@@ -131,7 +124,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
         {op.state === 'completed' && <button onClick={() => void perform(() => openImportedSession(ctx, op.targetSessionId))}>打开会话</button>}
         {['failed', 'needs-attention', 'canceled'].includes(op.state) && <button disabled={busy} onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: op.previewId }, signal); if (!page.preview) return; const retry = await call<Operation>('commit', { previewId: op.previewId, reportHash: page.preview.report.reportHash, requestId: crypto.randomUUID() }, signal); setOperations(old => old.map(o => o.operationId === retry.operationId ? retry : o)); })}>重新核对并重试</button>}
         {['prepared', 'writing', 'verifying'].includes(op.state) && <button onClick={() => void perform(async signal => { await call('cancel', { operationId: op.operationId }, signal); })}>请求停止</button>}
-        <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: op.previewId }, signal); setSelected(undefined); setPreview(page.preview); setMessages(page.items); setTotal(page.total); setReviewOnly(true); })}>查看报告</button>
+        <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: op.previewId }, signal); setSelected(undefined); setPreview(page.preview); setMessages(page.items); setTotal(page.total); setReviewOnly(true); })}>查看对话</button>
         <a href={'api/dsh-alink.archive?operationId=' + encodeURIComponent(op.operationId)} download>保存备份</a>
       </div></article>)}
     </section>

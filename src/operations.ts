@@ -1,5 +1,6 @@
 import { mkdir, readFile, open, rename, rm, realpath, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+import { conversationMessages } from './preview.js';
 import path from 'node:path';
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence';
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment';
@@ -80,7 +81,8 @@ export class MigrationService {
   previewPage(id: string, offset = 0) {
     const stored = this.stored(id), { plan } = stored;
     if (!Number.isSafeInteger(offset) || offset < 0) throw new LinkError('INVALID_QUERY');
-    return { ...(offset === 0 ? { preview: stored.preview } : {}), total: plan.messages.length, offset, items: plan.messages.slice(offset, offset + 80).map(m => ({ ...m,
+    const messages = conversationMessages(plan);
+    return { ...(offset === 0 ? { preview: stored.preview } : {}), total: messages.length, offset, items: messages.slice(offset, offset + 80).map(m => ({ ...m,
       content: m.content.map(b => b.type === 'text' && b.text.length > 20000 ? { type: 'text', text: b.text.slice(0, 20000) + '\n…（仅预览截断，迁入保留完整内容）' } : b) })) };
   }
   async commit(request: CommitRequest): Promise<Operation> {

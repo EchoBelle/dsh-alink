@@ -8,8 +8,8 @@ for (const [app, title] of cases) test(`${app}: active source to native conversa
   const root = process.env.DSH_ALINK_TEST_HOME!;
   const { url } = JSON.parse(await readFile(path.join(root, 'host.json'), 'utf8'));
   await openHarness(page, url);
-  await expect(page.getByRole('button', { name: '会话迁移', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '会话迁移', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Alink', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Alink', exact: true }).click();
   await page.getByLabel('来源应用').selectOption(app);
   await expect(page.getByRole('button', { name: '打开预览：' + title })).toBeVisible();
   await expect(page.getByRole('button', { name: /打开预览：.*不应出现/ })).toHaveCount(0);
@@ -27,7 +27,7 @@ for (const [app, title] of cases) test(`${app}: active source to native conversa
 
 test('legacy DSH file import verifies source status and creates a native conversation', async ({ page }) => {
   const root=process.env.DSH_ALINK_TEST_HOME!, {url}=JSON.parse(await readFile(path.join(root,'host.json'),'utf8'));
-  await openHarness(page,url);await page.getByRole('button',{name:'会话迁移',exact:true}).click();
+  await openHarness(page,url);await page.getByRole('button',{name:'Alink',exact:true}).click();
   await page.getByText('从备份导入',{exact:true}).click();
   await page.getByLabel('备份文件').setInputFiles(path.join(root,'sources/dsh/sessions/p/archived/session.jsonl.zstd'));
   await expect(page.getByRole('alert')).toContainText('原会话已归档');

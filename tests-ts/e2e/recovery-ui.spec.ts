@@ -13,7 +13,7 @@ test('a killed writer exposes recovery in the UI and archived sources still cann
   const db=new DatabaseSync(path.join(wb,'workbuddy.db'));
   db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?)').run('recovery','恢复入口验收',root,'completed',null,1);
   await writeFile(path.join(wb,'projects/p/recovery.jsonl'),JSON.stringify({type:'message',role:'user',sessionId:'recovery',content:'恢复入口验收'})+'\n');
-  await openHarness(page, url);await expect(page.getByRole('button',{name:'会话迁移',exact:true})).toBeVisible();
+  await openHarness(page, url);await expect(page.getByRole('button',{name:'Alink',exact:true})).toBeVisible();
   const endpoint=new URL('/api/dsh-alink.rpc',url).href;
   const rpc=async (name:string,payload:unknown={})=>(await page.request.post(endpoint,{data:{endpoint:name,payload},headers:{Origin:new URL(url).origin}})).json();
   const list=await rpc('sessions',{app:'workbuddy'}), source=list.value.items.find((s:{nativeId:string})=>s.nativeId==='recovery');
@@ -24,7 +24,7 @@ test('a killed writer exposes recovery in the UI and archived sources still cann
   const [code,signal]=await once(child,'exit');expect(code).toBeNull();expect(signal).toBe('SIGKILL');
   const reserved=JSON.parse(await readFile(resultFile,'utf8'));
   try {
-    await page.getByRole('button',{name:'会话迁移',exact:true}).click();
+    await page.getByRole('button',{name:'Alink',exact:true}).click();
     const row=page.getByRole('region',{name:'迁移记录'}).locator('article').filter({has:page.getByText('恢复入口验收',{exact:true})}).first();
     await expect(row.getByText('需要核对',{exact:true})).toBeVisible();
     await expect(row.getByRole('button',{name:'重新核对并重试'})).toBeEnabled();

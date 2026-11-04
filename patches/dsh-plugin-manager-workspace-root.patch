@@ -1,0 +1,12 @@
+diff --git a/packages/boot/plugin-manager/src/index.ts b/packages/boot/plugin-manager/src/index.ts
+--- a/packages/boot/plugin-manager/src/index.ts
++++ b/packages/boot/plugin-manager/src/index.ts
+@@ -938,7 +938,7 @@
+           result.registries.push(registry)
+           used = registry
+           announce('installing', { registry, index: index + 1, total: plan.length })
+-          run = await this.runPnpm(['add', installSpec, ...options?.saveExact === true ? ['--save-exact'] : [], ...registryArguments(registry)], control.abort.signal, requestId)
++          run = await this.runPnpm(['add', '--workspace-root', installSpec, ...options?.saveExact === true ? ['--save-exact'] : [], ...registryArguments(registry)], control.abort.signal, requestId)
+           result.packageResult = run
+           if (stopped()) throw new InstallCancelledError()
+           // A compatibility refusal is the package's own answer, so no other registry is asked.

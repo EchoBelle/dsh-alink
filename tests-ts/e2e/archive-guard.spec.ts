@@ -8,7 +8,7 @@ test('archiving after backup/preview blocks list, backup upload, commit and retr
   const root=process.env.DSH_ALINK_TEST_HOME!, {url}=JSON.parse(await readFile(path.join(root,'host.json'),'utf8'));
   const endpoint=new URL('/api/dsh-alink.rpc',url).href;
   await openHarness(page, url);
-  await expect(page.getByRole('button',{name:'会话迁移',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Alink',exact:true})).toBeVisible();
   const rpc=async (name:string,payload:unknown={})=>(await page.request.post(endpoint,{data:{endpoint:name,payload},headers:{Origin:new URL(url).origin}})).json();
   const list=await rpc('sessions',{app:'workbuddy'}); expect(list.ok).toBe(true);
   const target={cwd:root,agentPreset:'standard'};
@@ -34,7 +34,7 @@ test('archiving after backup/preview blocks list, backup upload, commit and retr
     ]) expect(result).toMatchObject({ok:false,error:{code:'SOURCE_INACTIVE'}});
     const oldPreview=await rpc('previewPage',{previewId:op.previewId});
     expect(await rpc('commit',{previewId:op.previewId,reportHash:oldPreview.value.preview.report.reportHash,requestId:'archived-retry'})).toMatchObject({ok:false,error:{code:'SOURCE_INACTIVE'}});
-    await page.getByRole('button',{name:'会话迁移',exact:true}).click();
+    await page.getByRole('button',{name:'Alink',exact:true}).click();
     await expect(page.getByRole('button',{name:'打开预览：活动会话 海星'})).toHaveCount(0);
     await page.getByText('从备份导入',{exact:true}).click();
     await page.getByLabel('备份文件').setInputFiles(file);
