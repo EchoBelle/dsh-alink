@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Context } from '@deepseek-ai/cordis';
 import type { SessionId } from '@deepseek-ai/dsh-session/types';
-import type { Operation, Preview, SourceApp, SourceSession, Transfer } from '../contracts.js';
+import type { Operation, SourceApp, SourceSession, Transfer } from '../contracts.js';
 import { call, friendlyError } from './api.js';
 import { openImportedSession } from './navigation.js';
 import { exportToFile } from './export-file.js';
+import { ConversationView } from './ConversationView.js';
 interface SourceInfo { app: SourceApp; available: boolean; count: number; unknown?: boolean; error?: string }
 interface Targets { workspaces: Array<{ id: string; path: string; title: string }>; presets: Array<{ id: string; name?: string; broken?: string }>; defaultPreset: string }
-interface Message { role: string; content: Array<{ type: string; text?: string }> }
-interface PreviewPage { inspectionId?: string; title?: string; preview?: Preview; items: Message[]; total: number; offset: number }
 const names: Record<string, string> = { workbuddy: 'WorkBuddy', codex: 'Codex', raccoon: '小浣熊', cursor: 'Cursor', dsh: 'DSH' };
 const states: Record<string, string> = { prepared: '排队中', writing: '迁入中', verifying: '核对中', completed: '迁移完成', failed: '迁移失败', canceled: '已取消', 'needs-attention': '需要核对' };
 const running = (job: Transfer) => ['queued', 'running'].includes(job.state);
@@ -23,8 +22,6 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
   const [sessions, setSessions] = useState<SourceSession[]>([]), [cursor, setCursor] = useState<string>();
   const [selection, setSelection] = useState<Map<string, SourceSession>>(new Map()), [focus, setFocus] = useState<SourceSession & { recordPreviewId?: string }>();
   const [targetMode, setTargetMode] = useState('original'), [cwd, setCwd] = useState(''), [preset, setPreset] = useState('');
-  const [preview, setPreview] = useState<Preview>(), [messages, setMessages] = useState<Message[]>([]), [total, setTotal] = useState(0), [previewTitle, setPreviewTitle] = useState('');
-  const [inspectionId, setInspectionId] = useState(''), [reading, setReading] = useState(false), [readError, setReadError] = useState(''), [readRevision, setReadRevision] = useState(0), [viewFor, setViewFor] = useState('');
   const [toast, setToast] = useState<{ title: string; detail?: string; error?: boolean }>(), [exporting, setExporting] = useState(false);
   const seenTransfers = useRef(new Map<string, string>()), standaloneImports = useRef(new Set<string>());
   const [operations, setOperations] = useState<Operation[]>([]), [transfers, setTransfers] = useState<Transfer[]>([]);
@@ -44,9 +41,6 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
   const selected = [...selection.values()];
   const importBusy = transfers.some(job => job.kind === 'import' && running(job));
   const active = transfers.some(running) || operations.some(op => ['prepared', 'writing', 'verifying'].includes(op.state));
-  const clearPreview = () => { setPreview(undefined); setInspectionId(''); setMessages([]); setTotal(0); setPreviewTitle(''); setReadError(''); setViewFor(''); };
-  const focusKey = focus?.recordPreviewId || focus?.sourceId || '';
-  const viewMatches = viewFor === focusKey;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; action.current?.abort(); }; }, []);
   useEffect(() => {
     const controller = new AbortController();
@@ -63,21 +57,6 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [app, query, revision]);
-  useEffect(() => {
-    if (!focusKey) { clearPreview(); setReading(false); return; }
-    const controller = new AbortController();
-    clearPreview(); setReading(true);
-    const timer = setTimeout(() => {
-      const endpoint = focus?.recordPreviewId ? 'previewPage' : 'inspect';
-      const payload = focus?.recordPreviewId ? { previewId: focus.recordPreviewId } : { sourceId: focus!.sourceId };
-      call<PreviewPage>(endpoint, payload, controller.signal).then(page => {
-        if (controller.signal.aborted) return;
-        setPreview(page.preview); setInspectionId(page.inspectionId || ''); setMessages(page.items); setTotal(page.total); setPreviewTitle(page.title || focus!.title); setViewFor(focusKey);
-      }).catch(error => { if (!controller.signal.aborted) setReadError(friendlyError(error)); })
-        .finally(() => { if (!controller.signal.aborted) setReading(false); });
-    }, 120);
-    return () => { clearTimeout(timer); controller.abort(); };
-  }, [focusKey, revision, readRevision]);
   useEffect(() => {
     for (const job of transfers) {
       const before = seenTransfers.current.get(job.id);
@@ -123,7 +102,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
     if (add && items[0]) { setFocus(items[0]); if (!cwd) setCwd(items[0].cwd || ''); }
     else if (focus && !next.has(focus.sourceId)) setFocus(next.values().next().value);
   }
-  function choose(source: SourceSession) { const same = focus?.sourceId === source.sourceId; toggle([source], true); setFocus(source); if (same) setReadRevision(value => value + 1); }
+  function choose(source: SourceSession) { toggle([source], true); }
   function updateTransfer(job: Transfer) { if (mounted.current) setTransfers(old => [job, ...old.filter(item => item.id !== job.id)]); }
   async function startImport(signal: AbortSignal) {
     const job = await call<Transfer>('importMany', {
@@ -170,7 +149,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
     <header className="dsh-alink-header"><h1>Alink</h1><nav aria-label="Alink 页面">
       <button className={tab === 'sources' ? 'current' : ''} onClick={() => setTab('sources')}>会话</button>
       <button className={tab === 'records' ? 'current' : ''} onClick={() => setTab('records')}>迁移记录</button>
-    </nav><div className="dsh-alink-header-actions"><button onClick={() => setLocalOpen(value => !value)}>从本地导入</button><button disabled={busy} onClick={() => { clearPreview(); setRevision(value => value + 1); }}>刷新来源</button></div></header>
+    </nav><div className="dsh-alink-header-actions"><button onClick={() => setLocalOpen(value => !value)}>从本地导入</button><button disabled={busy} onClick={() => { setRevision(value => value + 1); }}>刷新来源</button></div></header>
     {error && <div className="dsh-alink-error" role="alert">{error}</div>}
     {toast && <aside className={'dsh-alink-toast' + (toast.error ? ' is-error' : '')} role={toast.error ? 'alert' : 'status'} aria-live="polite"><span className="dsh-alink-toast-icon" aria-hidden="true">{toast.error ? '!' : '✓'}</span><div><strong>{toast.title}</strong>{toast.detail && <p>{toast.detail}</p>}</div><button aria-label="关闭提示" onClick={() => setToast(undefined)}>×</button></aside>}
     {localOpen && <section className="dsh-alink-local" aria-label="本地导入"><label>选择导出包或旧 DSH 日志<input aria-label="备份文件" type="file" multiple accept=".zip,.jsonl,.zstd" disabled={busy} onChange={e => { const files = [...e.target.files || []]; if (files.length) void perform(signal => upload(files, signal)); e.target.value = ''; }} /></label>
@@ -195,7 +174,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
         </details>)}</div>}
         {cursor && <button onClick={() => void perform(async signal => { const page = await call<{ items: SourceSession[]; nextCursor?: string }>('sessions', { app, text: query, cursor, limit: 100 }, signal); setSessions(old => [...old, ...page.items]); setCursor(page.nextCursor); })}>加载更多</button>}
       </aside>
-      <main className="dsh-alink-preview"><section className="dsh-alink-selection" aria-label="导入与导出"><div className="dsh-alink-selection-heading"><h2>{selected.length ? `已选择 ${selected.length} 条会话` : '选择会话'}</h2>{selected.length > 0 && <button onClick={() => { setSelection(new Map()); setFocus(undefined); clearPreview(); }}>清空选择</button>}</div>
+      <main className="dsh-alink-preview"><section className="dsh-alink-selection" aria-label="导入与导出"><div className="dsh-alink-selection-heading"><h2>{selected.length ? `已选择 ${selected.length} 条会话` : '选择会话'}</h2>{selected.length > 0 && <button onClick={() => { setSelection(new Map()); setFocus(undefined); }}>清空选择</button>}</div>
         {!selected.length ? <p className="dsh-alink-note">勾选会话或整个项目，然后直接导入或导出。</p> : <><ul className="dsh-alink-picked">{selected.map(item => <li key={item.sourceId}><span>{item.title}</span><small>{names[item.app]}</small><button aria-label={'取消选择：' + item.title} onClick={() => toggle([item], false)}>×</button></li>)}</ul>
           <div className="dsh-alink-targets"><label>导入项目<select aria-label="导入项目" value={targetMode} onChange={e => { setTargetMode(e.target.value); }}><option value="original">保留各会话的原项目</option><option value="single">统一到指定项目</option></select></label><label>DSH 配置<select aria-label="DSH 配置" value={preset} onChange={e => { setPreset(e.target.value); }}>{targets.presets.map(item => <option key={item.id} value={item.id} disabled={!!item.broken}>{item.name || ({ standard: '标准模式', minimal: '精简模式' } as Record<string, string>)[item.id] || item.id}</option>)}</select></label></div>
           {targetMode === 'single' && <label className="dsh-alink-unified">目标项目目录<input aria-label="目标项目目录" value={cwd} list="dsh-alink-workspaces" onChange={e => { setCwd(e.target.value); }} placeholder="选择或填写已有项目目录" /><datalist id="dsh-alink-workspaces">{targets.workspaces.map(item => <option key={item.id} value={item.path}>{item.title}</option>)}</datalist></label>}
@@ -203,11 +182,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
           <div className="dsh-alink-primary-actions"><button disabled={busy || exporting} onClick={() => void startExport()}>{exporting ? '正在导出…' : `导出所选（${selected.length}）`}</button><button className="primary" disabled={busy || importBusy || !preset || !validTarget} onClick={() => void perform(startImport)}>导入所选（{selected.length}）</button></div>
         </>}
       </section>
-      {focus && <section className="dsh-alink-inspect" aria-busy={reading}><div className="dsh-alink-preview-actions"><h3>{viewMatches ? previewTitle || focus.title : focus.title}</h3>{viewMatches && !reading && !readError && <span>{total} 条对话</span>}</div>
-        {reading || (!viewMatches && !readError) ? <div className="dsh-alink-reading" role="status" aria-label="正在加载对话"><span className="dsh-alink-spinner" aria-hidden="true" /><span>正在读取对话…</span><div className="dsh-alink-skeleton" aria-hidden="true"><i/><i/><i/></div></div> : readError ? <div className="dsh-alink-read-error" role="alert"><p>{readError}</p><button onClick={() => setReadRevision(value => value + 1)}>重新读取</button></div> : viewMatches && <>
-          <div className="dsh-alink-messages" role="region" aria-label="对话历史">{messages.length ? messages.map((message, index) => <article key={index}><small>{message.role === 'user' ? '用户' : '助手'}</small>{message.content.map((block, i) => block.type === 'text' ? <pre key={i}>{block.text}</pre> : null)}</article>) : <p className="dsh-alink-empty">此会话暂无可展示的文字消息。</p>}</div>
-          {messages.length < total && <button disabled={busy} onClick={() => void perform(async signal => { const page = await call<PreviewPage>(inspectionId ? 'inspectionPage' : 'previewPage', inspectionId ? { inspectionId, offset: messages.length } : { previewId: preview!.previewId, offset: messages.length }, signal); setMessages(old => [...old, ...page.items]); })}>加载更多对话</button>}</>}
-      </section>}
+      {focus?.recordPreviewId ? <ConversationView key={focus.recordPreviewId} previewId={focus.recordPreviewId} title={focus.title} revision={revision} /> : selected.map(item => <ConversationView key={item.sourceId} sourceId={item.sourceId} title={item.title} revision={revision} />)}
       </main>
     </div> : <section className="dsh-alink-operations" aria-label="迁移记录"><h2>迁移记录</h2>{problemTransfers.map(job => <details className="dsh-alink-task-result" key={job.id}><summary>{job.kind === 'import' ? '导入' : '导出'}任务 · {job.items.filter(item => item.state === 'completed').length}/{job.items.length} 条完成</summary>{job.items.filter(item => item.errorCode || item.warning).map(item => <p key={item.sourceId}>{item.title || '会话'}：{item.warning || friendlyError({ code: item.errorCode })}</p>)}{job.state !== 'completed' && <button disabled={busy || exporting} onClick={() => job.kind === 'export' ? void startExport(job) : void perform(async () => { const next = await call<Transfer>('retryTransfer', { id: job.id }); seenTransfers.current.set(next.id, 'queued'); updateTransfer(next); })}>重试未完成项</button>}</details>)}{!operations.length && <p className="dsh-alink-empty">暂无迁移记录。</p>}{operations.map(op => <article key={op.operationId}><div><button className="dsh-alink-record-title" aria-label={'打开记录：' + op.title} onClick={() => { setTab('sources'); setFocus({ sourceId: '', nativeId: '', app, title: op.title, recordPreviewId: op.previewId }); }}>{op.title}</button><span role="status">{states[op.state]}{op.outdated ? ' · 旧版导入' : ''}</span>{op.errorCode && <small>{friendlyError({ code: op.errorCode })}</small>}</div><div className="dsh-alink-operation-actions">
       {op.state === 'completed' && <button onClick={() => void perform(() => openImportedSession(ctx, op.targetSessionId))}>打开会话</button>}

@@ -38,20 +38,8 @@ export declare class MigrationService {
     source(sourceId: string, signal?: AbortSignal): Promise<SourceLocator>;
     captureSource(sourceId: string, destination: string, signal?: AbortSignal): Promise<CaptureResult>;
     inspect(sourceId: string, signal?: AbortSignal): Promise<{
-        inspectionId: string;
-        total: number;
-        offset: number;
-        items: {
-            content: {
-                type: "text";
-                text: string;
-            }[];
-            role: "user" | "assistant";
-        }[];
         title: string;
-    }>;
-    inspectionPage(id: string, offset?: number): {
-        inspectionId: string;
+        inspectionId: `${string}-${string}-${string}-${string}-${string}`;
         total: number;
         offset: number;
         items: {
@@ -61,7 +49,19 @@ export declare class MigrationService {
             }[];
             role: "user" | "assistant";
         }[];
-    };
+    }>;
+    inspectionPage(id: string, offset?: number): Promise<{
+        inspectionId: string;
+        total: number;
+        offset: number;
+        items: {
+            role: "user" | "assistant";
+            content: {
+                type: "text";
+                text: string;
+            }[];
+        }[];
+    }>;
     preview(sourceId: string, target: TargetSelection, signal?: AbortSignal): Promise<Preview>;
     private stored;
     previewPage(id: string, offset?: number): {

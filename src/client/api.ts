@@ -1,5 +1,6 @@
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection/client';
 const errors: Record<string, string> = {
+  PREVIEW_NOT_FOUND: '对话读取已过期，请重新读取。',
   SOURCE_HISTORY_MISSING: '来源历史日志尚未完整保存，请在原应用打开该会话后重试。',
   MAPPING_CHANGED: '迁入规则已更新，请重新导入以生成仅包含对话的新会话。',
   CANCELED: '任务已停止。', EXPORT_NOT_READY: '导出文件尚未准备好。', TRANSFER_NOT_FOUND: '任务记录不存在，请刷新。',

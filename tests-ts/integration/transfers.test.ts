@@ -180,8 +180,31 @@ it('reads dialogue without a valid target or a committable migration preview', a
     expect(view.total).toBe(2); expect(view.items.map(item => item.role)).toEqual(['user', 'assistant']);
     expect(f.service.operations()).toEqual([]); expect(await f.ctx.sessionPersistence.list()).toEqual([]);
     await expect(f.service.commit({ previewId: view.inspectionId, reportHash: '0'.repeat(64), requestId: 'inspect-is-readonly' })).rejects.toMatchObject({ code: 'PREVIEW_NOT_FOUND' });
-    expect(f.service.inspectionPage(view.inspectionId, 1).items).toHaveLength(1);
+    expect((await f.service.inspectionPage(view.inspectionId, 1)).items).toHaveLength(1);
     const { readdir } = await import('node:fs/promises');
     expect(await readdir(path.join(f.root, 'data/snapshots'))).toEqual([]);
+  } finally { await f.cleanup(); }
+});
+
+it('keeps every selected dialogue pageable after more than three inspections and cleans the display cache', async () => {
+  const f = await fixture();
+  try {
+    const views = [];
+    for (const id of ['one', 'two', 'three', 'four', 'five']) {
+      f.db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?)').run(id, id, f.root, 'completed', null, 1);
+      await writeFile(path.join(f.root, 'wb/projects/p', id + '.jsonl'), Array.from({ length: 82 }, (_, index) => JSON.stringify({
+        type: 'message', role: index % 2 ? 'assistant' : 'user', content: `${id} message ${index}`, sessionId: id,
+      })).join('\n') + '\n');
+      views.push(await f.service.inspect(f.ids([id])[0]));
+    }
+    for (let index = 0; index < views.length; index++) {
+      expect(views[index].items).toHaveLength(80);
+      const page = await f.service.inspectionPage(views[index].inspectionId, 80);
+      expect(page.total).toBe(82); expect(page.items).toHaveLength(2);
+      expect(page.items[0].content[0].text).toBe(['one', 'two', 'three', 'four', 'five'][index] + ' message 80');
+    }
+    expect(f.service.operations()).toHaveLength(0);
+    await f.service.close();
+    await expect(readFile(path.join(f.root, 'data/inspections', views[0].inspectionId + '.json'))).rejects.toMatchObject({ code: 'ENOENT' });
   } finally { await f.cleanup(); }
 });

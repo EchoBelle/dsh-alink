@@ -107,7 +107,14 @@
 .dsh-alink-unified { margin: 0 0 16px; }
 .dsh-alink-primary-actions { padding-top: 4px; }
 .dsh-alink-primary-actions button { flex: 1; min-height: 42px; }
-.dsh-alink-inspect { margin-top: 24px; border-top: 1px solid var(--link-line); }
+.dsh-alink-inspect { margin-top: 18px; padding: 14px; min-width: 0; border: 1px solid var(--link-line); border-radius: 12px; }
+.dsh-alink-inspect>summary { margin: 0; list-style: none; cursor: pointer; }
+.dsh-alink-inspect>summary::-webkit-details-marker { display: none; }
+.dsh-alink-inspect>summary::marker { content: ""; }
+.dsh-alink-inspect[open]>summary { margin-bottom: 14px; }
+.dsh-alink-inspect[open]>summary .dsh-alink-chevron { transform: rotate(90deg); }
+.dsh-alink-inspect .dsh-alink-messages { max-height: 38vh; }
+.dsh-alink-inspect>button { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .dsh-alink-preview-actions h3 { min-width: 0; overflow-wrap: anywhere; flex: 1; }
 .dsh-alink-preview-actions button { flex-shrink: 0; }
 .dsh-alink-transfer { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 16px; margin: 0 0 16px; border: 1px solid var(--link-line); border-radius: 10px; background: color-mix(in srgb,currentColor 2%,Canvas); }

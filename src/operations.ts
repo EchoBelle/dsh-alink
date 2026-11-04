@@ -35,11 +35,13 @@ export class MigrationService {
   readonly ledger: Ledger;
   private readonly jobs = new Map<string, { operation: Operation; controller: AbortController; promise: Promise<void> }>();
   private accepting = true;
-  private readonly inspections = new Map<string, ReturnType<typeof conversationMessages>>();
+  private readonly inspections = new Set<string>();
   private readonly exports = new Map<string, Promise<string>>();
   private constructor(readonly options: Options) { this.ledger = new Ledger(path.join(options.directory, 'operations.sqlite')); }
   static async create(options: Options): Promise<MigrationService> {
     for (const folder of ['', 'snapshots', 'operations', 'uploads', 'exports']) await mkdir(path.join(options.directory, folder), { recursive: true, mode: 0o700 });
+    await rm(path.join(options.directory, 'inspections'), { recursive: true, force: true });
+    await mkdir(path.join(options.directory, 'inspections'), { mode: 0o700 });
     const service = new MigrationService(options); service.ledger.reconcile(); return service;
   }
   private ready() { if (!this.accepting) throw new LinkError('PLUGIN_CLOSED'); }
@@ -73,17 +75,30 @@ export class MigrationService {
       // This target is only input to the shared mapper; no import plan or receipt is saved.
       const plan = await buildMigrationPlan(capture.archivePath, { cwd: source.cwd || '', agentPreset: '' }, this.options.limits);
       signal?.throwIfAborted(); this.ready();
-      this.inspections.set(id, conversationMessages(plan));
-      while (this.inspections.size > 3) this.inspections.delete(this.inspections.keys().next().value!);
-      return { title: source.title, ...this.inspectionPage(id) };
+      // Read-only display data lives on disk so a batch of large chats does not stay in memory.
+      const messages = conversationMessages(plan).map(message => ({ ...message, content: message.content.map(block =>
+        block.text.length > 20000 ? { ...block, text: block.text.slice(0, 20000) + '\n…（仅展示截断，迁入保留完整内容）' } : block) }));
+      await atomicJson(path.join(this.options.directory, 'inspections', id + '.json'), messages);
+      signal?.throwIfAborted(); this.ready();
+      this.inspections.add(id);
+      while (this.inspections.size > 100) {
+        const oldest = this.inspections.values().next().value!; this.inspections.delete(oldest);
+        await rm(path.join(this.options.directory, 'inspections', oldest + '.json'), { force: true });
+      }
+      return { title: source.title, inspectionId: id, total: messages.length, offset: 0, items: messages.slice(0, 80) };
+    } catch (error) {
+      this.inspections.delete(id);
+      await rm(path.join(this.options.directory, 'inspections', id + '.json'), { force: true });
+      throw error;
     } finally { await rm(destination, { recursive: true, force: true }); }
   }
-  inspectionPage(id: string, offset = 0) {
-    const messages = this.inspections.get(id); if (!messages) throw new LinkError('PREVIEW_NOT_FOUND');
+  async inspectionPage(id: string, offset = 0) {
+    this.ready();
+    if (!this.inspections.has(id)) throw new LinkError('PREVIEW_NOT_FOUND');
     if (!Number.isSafeInteger(offset) || offset < 0) throw new LinkError('INVALID_QUERY');
-    this.inspections.delete(id); this.inspections.set(id, messages);
-    return { inspectionId: id, total: messages.length, offset, items: messages.slice(offset, offset + 80).map(message => ({ ...message,
-      content: message.content.map(block => block.text.length > 20000 ? { ...block, text: block.text.slice(0, 20000) + '\n…（仅展示截断，迁入保留完整内容）' } : block) })) };
+    this.inspections.delete(id); this.inspections.add(id);
+    const messages: ReturnType<typeof conversationMessages> = JSON.parse(await readFile(path.join(this.options.directory, 'inspections', id + '.json'), 'utf8'));
+    return { inspectionId: id, total: messages.length, offset, items: messages.slice(offset, offset + 80) };
   }
   async preview(sourceId: string, target: TargetSelection, signal?: AbortSignal): Promise<Preview> {
     this.ready(); const resolved = await this.options.resolveTarget(target);
@@ -287,5 +302,6 @@ export class MigrationService {
     for (const job of this.jobs.values()) job.controller.abort();
     await Promise.allSettled([...this.jobs.values()].map(j => j.promise));
     await this.options.worker.close(); this.inspections.clear(); this.ledger.close();
+    await rm(path.join(this.options.directory, 'inspections'), { recursive: true, force: true });
   }
 }
