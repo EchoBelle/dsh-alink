@@ -1,5 +1,4 @@
 import type { Context } from '@deepseek-ai/cordis';
-import React from 'react';
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client';
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client';
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client';

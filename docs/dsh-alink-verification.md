@@ -2,18 +2,23 @@
 
 当前固定适配 DSH 0.2.1-rc.5、Node 24.14.0，验收平台为 macOS Apple Silicon。
 
-重命名后的迁移实现通过 28 项单元、14 项原生服务集成、7 项浏览器验收；5 条会话分别通过重启续聊和移除插件后的续聊。测试使用合成数据、真实 DSH 运行时及本地测试模型。
+当前迁移实现通过 28 项单元、14 项原生服务集成、9 项浏览器验收；5 条会话分别通过重启续聊和移除插件后的续聊。测试使用合成数据、真实 DSH 运行时及本地测试模型。
 
 归档防护覆盖来源列表、捕获、备份注册、预览、提交和重试。备份的对象路径必须带合法哈希且位于归档边界内；崩溃遗留操作会变为可恢复状态并保留原目标 ID；NULL、空及未知归档状态不会视为有效。
 
 GitHub 安装的独立验证结果见 [GitHub 安装与验收](github-installation.md)。
 
+2026-11-04 清理复验：卸载全局 DSH 0.1.2-rc.1，安装 npm `latest` 对应的 0.2.1-rc.5，并停止仍在运行的旧进程。使用新安装的全局 CLI，在工作区之外的全新 DSH_HOME 通过 `dsh plugin` 安装清理后的发布包，上述检查全部通过。本机现有 Web profile 也通过新版配置解析。
+
+已删除旧 ALink 桌面/Python 实现、旧构建产物、虚拟环境和过时测试目录；当前插件删除未使用的导入、请求参数、4 项开发依赖及重复测试辅助脚本。面板导航和卸载后阅读检查已接入统一发布包验收，类型检查启用未使用代码检查。当前会话迁移及归档校验保持完整。
+
 ```sh
 pnpm typecheck
 pnpm test
 pnpm test:integration
-pnpm test:package
-node scripts/release-smoke.mjs .local/releases/dsh-alink-0.1.0.tgz
+pnpm test:e2e
 ```
+
+`test:e2e` 自动构建和检查发布包，再创建隔离测试环境。默认使用项目固定版本的 DSH；可设置 `DSH_ALINK_TEST_CLI` 为全局 DSH 的 JavaScript 启动文件路径，以验证另一个安装。结果记录所用 CLI 路径及版本。
 
 完整浏览器验收需要本机 Google Chrome。所有测试都使用隔离 DSH_HOME，不迁移日常会话，不调用真实模型服务。

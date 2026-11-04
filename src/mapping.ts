@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { readJsonl, encode } from './sources/jsonl.js';
 import { archiveDigest, readManifest, validateArchive } from './archive.js';
-import type { MappingReport, MigrationIssue, TargetSelection, PortableResource, PortableEvent, IssueDisposition } from './contracts.js';
+import type { MappingReport, TargetSelection, PortableResource, PortableEvent, IssueDisposition } from './contracts.js';
 import { createImportedHistory, digest, type FrozenHistory } from './dsh/history.js';
 import type { ContentBlock } from '@deepseek-ai/dsh-llm';
 import { LinkError } from './transport.js';

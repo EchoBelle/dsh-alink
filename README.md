@@ -8,18 +8,10 @@ dsh-alink 是原生 TypeScript 插件，提供 DSH 内的“会话迁移”面�
 
 当前固定适配 **DSH 0.2.1-rc.5**、Node.js **24.14+（24 系列）**，验收平台为 macOS Apple Silicon。其他 DSH 版本需要完成兼容性验证后再放宽版本范围。
 
-从源码构建安装包：
-
-```sh
-pnpm install
-pnpm check:dsh
-pnpm build
-pnpm pack --pack-destination .local/releases
-```
-
 从 GitHub 安装（仓库包含预构建的 lib，不需要安装时编译）：
 
 ```sh
+npm install -g @deepseek-ai/dsh@0.2.1-rc.5
 dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.1.0
 dsh --profile web --dump-config
 dsh web
@@ -27,7 +19,7 @@ dsh web
 
 首次创建 Web profile 时，可先运行 `dsh --profile web --dump-config`。安装绑定到所选 profile；建议固定版本标签或完整提交 SHA。测试使用独立 `DSH_HOME`。
 
-项目开发依赖提供固定 DSH 版本，可用 `pnpm exec dsh` 执行上述命令。终端默认 DSH 若不是 0.2.1-rc.5，需要使用匹配版本。
+已安装匹配版本 DSH 时可跳过第一行。普通安装直接使用 `dsh` 命令，无需安装 pnpm 或克隆源码；上述命令可在 PowerShell、CMD 和 macOS 终端执行。Windows 的来源扫描仍需单独验证，目前默认来源路径以 macOS 为基础。
 
 ## 使用
 
@@ -65,19 +57,22 @@ DSH 的轮次和流式展示是重建结构，不代表来源真实执行过程�
 
 默认限制：单条 JSONL 16 MiB，归档/解压内容 2 GiB、ZIP 100000 条目，映射文本 32 MiB、活动消息 50000 条。超限不会静默截断目标历史；预览显示截断时仍保留完整迁入内容。图片另受 DSH 自身附件限制。
 
-原始包仍采用 `alink.session` 0.1.0，产品更名不改写历史格式。仓库和安装包提供原生插件实现；本地旧桌面参考代码与用户数据不参与发布。
+原始包仍采用 `alink.session` 0.1.0，产品更名不改写历史格式。旧桌面版代码已移除；仓库和安装包仅提供原生插件实现，用户数据不参与发布。
 
 ## 开发与验证
 
 ```sh
+pnpm install
+pnpm check:dsh
 pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
 pnpm test:package
+pnpm test:e2e
 ```
 
-浏览器测试使用隔离 DSH profile 和合成来源，详情见 [验证记录](docs/dsh-alink-verification.md)。`tests-ts/e2e` 不能指向日常使用的 DSH 数据库。
+pnpm 只用于源码开发。`test:package` 构建并检查发布包；`test:e2e` 从新发布包自动创建隔离 DSH profile，完成迁入、归档拦截、重启续聊和卸载后续聊验证，需要本机 Google Chrome。详情见 [验证记录](docs/dsh-alink-verification.md)。测试不能指向日常使用的 DSH 数据库。
 
 - [GitHub 安装与验收](docs/github-installation.md)
 - [归档格式](docs/format-v0.1.md)

@@ -1,4 +1,3 @@
-import type { Context } from '@deepseek-ai/cordis';
 import type { ConnectionRpcResult } from '@deepseek-ai/dsh-client-connection/client';
 const errors: Record<string, string> = {
   INTERRUPTED: '上次迁移中断，原目标会话标识已保留。请重新核对并重试。',
@@ -16,7 +15,7 @@ export function friendlyError(value: unknown): string {
   if (value && typeof value === 'object' && 'code' in value && typeof value.code === 'string' && errors[value.code]) return errors[value.code];
   return value instanceof Error ? value.message : '操作未完成，请重试。';
 }
-export async function call<T>(_ctx: Context, endpoint: string, payload: unknown = {}, signal?: AbortSignal): Promise<T> {
+export async function call<T>(endpoint: string, payload: unknown = {}, signal?: AbortSignal): Promise<T> {
   const response = await fetch('api/dsh-alink.rpc', { method: 'POST', credentials: 'same-origin', signal,
     headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ endpoint, payload }) });
   const result = await response.json().catch(() => undefined) as ConnectionRpcResult<T> | undefined;

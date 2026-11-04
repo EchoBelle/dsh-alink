@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Context } from '@deepseek-ai/cordis';
 import type { Operation, Preview, SourceApp, SourceSession } from '../contracts.js';
 import { call, friendlyError } from './api.js';
@@ -33,14 +33,14 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
   const invalidate = () => { action.current?.abort(); setBusy(false); setPreview(undefined); setMessages([]); requestId.current = ''; setReviewOnly(false); setError(''); };
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([call<SourceInfo[]>(ctx, 'sources', {}, controller.signal), call<Targets>(ctx, 'targets', {}, controller.signal), call<Operation[]>(ctx, 'operations', {}, controller.signal)])
+    Promise.all([call<SourceInfo[]>('sources', {}, controller.signal), call<Targets>('targets', {}, controller.signal), call<Operation[]>('operations', {}, controller.signal)])
       .then(([sourceList, targetList, jobs]) => { if (controller.signal.aborted) return; setSources(sourceList); setTargets(targetList); setOperations(jobs); setPreset(value => value || targetList.defaultPreset); })
       .catch(e => { if (!controller.signal.aborted) setError(friendlyError(e)); });
     return () => controller.abort();
   }, [ctx, revision]);
   useEffect(() => {
     const controller = new AbortController(); setLoading(true);
-    call<{ items: SourceSession[]; nextCursor?: string }>(ctx, 'sessions', { app, text: query, limit: 50 }, controller.signal)
+    call<{ items: SourceSession[]; nextCursor?: string }>('sessions', { app, text: query, limit: 50 }, controller.signal)
       .then(page => { if (!controller.signal.aborted) { setSessions(page.items); setCursor(page.nextCursor); } })
       .catch(e => { if (!controller.signal.aborted) { setError(friendlyError(e)); setSessions([]); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
@@ -51,7 +51,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
     if (!active) return;
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
-      try { if (!document.hidden) setOperations(await call<Operation[]>(ctx, 'operations', {}, controller.signal)); }
+      try { if (!document.hidden) setOperations(await call<Operation[]>('operations', {}, controller.signal)); }
       catch (e) { if (!controller.signal.aborted) setError(friendlyError(e)); }
       if (!controller.signal.aborted) timer = setTimeout(poll, 500);
     };
@@ -67,14 +67,14 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
   function choose(source: SourceSession) { invalidate(); setSelected(source); setCwd(source.cwd || ''); }
   async function prepare(signal: AbortSignal) {
     if (!selected) return;
-    const value = await call<Preview>(ctx, 'preview', { sourceId: selected.sourceId, target: { cwd, agentPreset: preset } }, signal);
-    const page = await call<PreviewPage>(ctx, 'previewPage', { previewId: value.previewId, offset: 0 }, signal);
+    const value = await call<Preview>('preview', { sourceId: selected.sourceId, target: { cwd, agentPreset: preset } }, signal);
+    const page = await call<PreviewPage>('previewPage', { previewId: value.previewId, offset: 0 }, signal);
     if (signal.aborted) return;
     setPreview(value); setMessages(page.items); setTotal(page.total); setReviewOnly(false); setIssueLimit(100); requestId.current = crypto.randomUUID();
   }
   async function commit(signal: AbortSignal) {
     if (!preview) return;
-    const op = await call<Operation>(ctx, 'commit', { previewId: preview.previewId, reportHash: preview.report.reportHash, requestId: requestId.current || (requestId.current = crypto.randomUUID()) }, signal);
+    const op = await call<Operation>('commit', { previewId: preview.previewId, reportHash: preview.report.reportHash, requestId: requestId.current || (requestId.current = crypto.randomUUID()) }, signal);
     setOperations(old => [op, ...old.filter(o => o.operationId !== op.operationId)]);
   }
   function reportDownload() {
@@ -104,11 +104,11 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
         {loading ? <p role="status">正在读取会话列表…</p> : !sessions.length ? <p className="dsh-alink-empty">没有可迁移的有效会话。</p> : <div className="dsh-alink-session-list">
           {sessions.map(s => <button key={s.sourceId} aria-label={'打开预览：' + s.title} className={selected?.sourceId === s.sourceId ? 'selected' : ''} onClick={() => choose(s)}><strong>{s.title}</strong><small title={s.cwd}>{s.cwd || '未关联本机项目'}</small></button>)}
         </div>}
-        {cursor && <button onClick={() => void perform(async signal => { const page = await call<{ items: SourceSession[]; nextCursor?: string }>(ctx, 'sessions', { app, text: query, cursor, limit: 50 }, signal); setSessions(old => [...old, ...page.items]); setCursor(page.nextCursor); })}>加载更多会话</button>}
+        {cursor && <button onClick={() => void perform(async signal => { const page = await call<{ items: SourceSession[]; nextCursor?: string }>('sessions', { app, text: query, cursor, limit: 50 }, signal); setSessions(old => [...old, ...page.items]); setCursor(page.nextCursor); })}>加载更多会话</button>}
         <details className="dsh-alink-import"><summary>从备份导入</summary><p>备份必须能关联到原应用中仍有效的会话。</p>
           <label className="dsh-alink-file">选择 ALink ZIP 或旧 DSH 日志<input aria-label="备份文件" type="file" accept=".zip,.jsonl,.zstd" onChange={e => { const file = e.target.files?.[0]; if (file) void perform(signal => upload(file, signal)); e.target.value = ''; }} /></label>
           <label>DSH 所在电脑上的备份目录<input aria-label="备份目录" value={directory} onChange={e => setDirectory(e.target.value)} placeholder="已有 .alink 目录的完整路径" /></label>
-          <button disabled={!directory || busy} onClick={() => void perform(async signal => { choose(await call<SourceSession>(ctx, 'registerFile', { path: directory, format: 'alink' }, signal)); })}>读取备份目录</button>
+          <button disabled={!directory || busy} onClick={() => void perform(async signal => { choose(await call<SourceSession>('registerFile', { path: directory, format: 'alink' }, signal)); })}>读取备份目录</button>
         </details>
       </aside>
       <main className="dsh-alink-preview">
@@ -120,7 +120,7 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
             {differences.length > 0 && <details open className="dsh-alink-differences"><summary>迁移差异 · {differences.length} 项</summary><ul>{differences.slice(0, issueLimit).map((i, n) => <li key={n}><b>{labels[i.disposition]}</b> {issueCopy[i.code] || i.detail}</li>)}</ul>{differences.length > issueLimit && <button onClick={() => setIssueLimit(v => v + 100)}>显示更多差异</button>}</details>}
             <div className="dsh-alink-preview-actions"><span>{total} 条迁入后历史</span><button onClick={reportDownload}>保存报告</button></div>
             <div className="dsh-alink-messages">{messages.map((m, i) => <article key={i} className={m.role}><small>{m.role === 'user' ? '用户 / 历史上下文' : '助手 / 历史说明'}</small>{m.content.map((b, j) => b.type === 'text' ? <pre key={j}>{b.text}</pre> : <p key={j}>📎 历史附件</p>)}</article>)}</div>
-            {messages.length < total && <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>(ctx, 'previewPage', { previewId: preview.previewId, offset: messages.length }, signal); setMessages(old => [...old, ...page.items]); })}>查看更多历史</button>}
+            {messages.length < total && <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: preview.previewId, offset: messages.length }, signal); setMessages(old => [...old, ...page.items]); })}>查看更多历史</button>}
             {!reviewOnly && <div className="dsh-alink-submit"><p>原始记录与资源保留在备份中。工具历史不会被执行。</p><button className="primary" disabled={busy || preview.report.counts.blocked > 0 || active} onClick={() => void perform(commit)}>{preview.report.counts.blocked ? '请先处理来源历史' : differences.length ? '按上述差异导入' : '导入会话'}</button></div>}
           </>}
         </>}
@@ -129,9 +129,9 @@ export function MigrationPanel({ ctx }: { ctx: Context }) {
     <section className="dsh-alink-operations" aria-label="迁移记录"><h2>迁移记录</h2>{!operations.length && <p className="dsh-alink-note">完成一次迁移后，可以在这里查看结果。</p>}
       {operations.map(op => <article key={op.operationId}><div><strong>{op.title}</strong><span role="status">{states[op.state]}</span>{op.errorCode && <small>{friendlyError({ code: op.errorCode })}</small>}</div><div className="dsh-alink-operation-actions">
         {op.state === 'completed' && <button onClick={() => void perform(() => openImportedSession(ctx, op.targetSessionId))}>打开会话</button>}
-        {['failed', 'needs-attention', 'canceled'].includes(op.state) && <button disabled={busy} onClick={() => void perform(async signal => { const page = await call<PreviewPage>(ctx, 'previewPage', { previewId: op.previewId }, signal); if (!page.preview) return; const retry = await call<Operation>(ctx, 'commit', { previewId: op.previewId, reportHash: page.preview.report.reportHash, requestId: crypto.randomUUID() }, signal); setOperations(old => old.map(o => o.operationId === retry.operationId ? retry : o)); })}>重新核对并重试</button>}
-        {['prepared', 'writing', 'verifying'].includes(op.state) && <button onClick={() => void perform(async signal => { await call(ctx, 'cancel', { operationId: op.operationId }, signal); })}>请求停止</button>}
-        <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>(ctx, 'previewPage', { previewId: op.previewId }, signal); setSelected(undefined); setPreview(page.preview); setMessages(page.items); setTotal(page.total); setReviewOnly(true); })}>查看报告</button>
+        {['failed', 'needs-attention', 'canceled'].includes(op.state) && <button disabled={busy} onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: op.previewId }, signal); if (!page.preview) return; const retry = await call<Operation>('commit', { previewId: op.previewId, reportHash: page.preview.report.reportHash, requestId: crypto.randomUUID() }, signal); setOperations(old => old.map(o => o.operationId === retry.operationId ? retry : o)); })}>重新核对并重试</button>}
+        {['prepared', 'writing', 'verifying'].includes(op.state) && <button onClick={() => void perform(async signal => { await call('cancel', { operationId: op.operationId }, signal); })}>请求停止</button>}
+        <button onClick={() => void perform(async signal => { const page = await call<PreviewPage>('previewPage', { previewId: op.previewId }, signal); setSelected(undefined); setPreview(page.preview); setMessages(page.items); setTotal(page.total); setReviewOnly(true); })}>查看报告</button>
         <a href={'api/dsh-alink.archive?operationId=' + encodeURIComponent(op.operationId)} download>保存备份</a>
       </div></article>)}
     </section>

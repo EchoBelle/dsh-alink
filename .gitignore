@@ -14,8 +14,7 @@ test-results/
 playwright-report/
 *.tgz
 
-# Local historical work and independent sibling plugin projects
-/legacy/
+# Independent sibling plugin projects and local research
 /plugins/
 /docs/research/
 /docs/superpowers/

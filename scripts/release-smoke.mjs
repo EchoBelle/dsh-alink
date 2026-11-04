@@ -15,12 +15,12 @@ const project = path.resolve('.'), requested = process.argv[2] || '.local/releas
 const fromGit = requested.startsWith('github:');
 const packageFile = fromGit ? requested : path.resolve(requested);
 const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-alink-release-'));
-const cli = path.join(project, 'node_modules/@deepseek-ai/dsh/lib/bin.js');
+const cli = process.env.DSH_ALINK_TEST_CLI || path.join(project, 'node_modules/@deepseek-ai/dsh/lib/bin.js');
 const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR, LANG: 'en_US.UTF-8', DSH_HOME: home };
 const evidence = path.join(project, '.local/verification');
 await mkdir(evidence, { recursive: true });
 await mkdir(path.join(project, '.local/releases'), { recursive: true });
-const summary = { home, package: packageFile, source: fromGit ? 'github' : 'tarball', ...(fromGit ? {} : { sha256: createHash('sha256').update(await readFile(packageFile)).digest('hex') }), phase: 'setup' };
+const summary = { home, cli, package: packageFile, source: fromGit ? 'github' : 'tarball', ...(fromGit ? {} : { sha256: createHash('sha256').update(await readFile(packageFile)).digest('hex') }), phase: 'setup' };
 const save = async phase => { summary.phase=phase; await writeFile(path.join(project,'.local/releases/latest-smoke.json'),JSON.stringify(summary,null,2)); console.log(phase); };
 async function run(command, args, options={}) {
   const child=spawn(command,args,{cwd:options.cwd||home,env:{...env,...options.env},stdio:['ignore','pipe','pipe']});
@@ -63,6 +63,7 @@ async function continuation(round,ids) {
 }
 try {
   await save('Preparing clean DSH home');
+  summary.dshVersion = (await run(process.execPath, [cli, '--version'])).trim();
   const pkg=JSON.parse(await readFile(path.join(project,'package.json'),'utf8'));
   await writeFile(path.join(home,'package.json'),JSON.stringify({name:'dsh-alink-release-fixture',private:true,type:'module',peerDependencies:pkg.peerDependencies}));
   await writeFile(path.join(home,'.dsh-alink-test'),'synthetic data only');
@@ -87,7 +88,7 @@ try {
     `- id: dsh-alink\n  config:\n    dataDir: ${JSON.stringify(path.join(home,'link-data'))}\n    sourceRoots:\n${Object.entries(roots).map(([key,value])=>'      '+key+': '+JSON.stringify(value)).join('\n')}`,
   ].join('\n')+'\n');
   await start('import');await save('Testing four source applications through native UI');
-  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/all-sources.spec.ts','tests-ts/e2e/archive-guard.spec.ts','tests-ts/e2e/recovery-ui.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_PACKAGE_MATRIX:'1'},log:'release-browser.log'});
+  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/all-sources.spec.ts','tests-ts/e2e/archive-guard.spec.ts','tests-ts/e2e/recovery-ui.spec.ts','tests-ts/e2e/plugin-shell.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_PACKAGE_MATRIX:'1'},log:'release-browser.log'});
   await stop();
   const db=new DatabaseSync(path.join(home,'link-data/operations.sqlite'),{readOnly:true});
   const ops=db.prepare('SELECT value FROM operations').all().map(row=>JSON.parse(row.value));db.close();
@@ -98,6 +99,8 @@ try {
   await save('Removing dsh-alink and validating native continuation again');
   await run(process.execPath,[cli,'plugin','--profile','web','remove','--workspace-root','dsh-alink'],{log:'release-remove.log'});
   const patch=(await readFile(path.join(home,'web.patch.yml'),'utf8')).split('\n- id: dsh-alink\n')[0]+'\n';await writeFile(path.join(home,'web.patch.yml'),patch);
-  summary.removedContinuation=await continuation('removed',ids);await stop();
+  summary.removedContinuation=await continuation('removed',ids);
+  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/plugin-disabled.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_DISABLED:'1'},log:'release-browser-removed.log'});
+  await stop();
   summary.sourceImports=5;summary.passed=true;await save('Release package verification passed');
 } finally { await stop(); }

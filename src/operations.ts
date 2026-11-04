@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, open, rename, rm, realpath, stat } from 'node:fs/promises';
+import { mkdir, readFile, open, rename, rm, realpath, stat } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { SessionPersistence } from '@deepseek-ai/dsh-session-persistence';
