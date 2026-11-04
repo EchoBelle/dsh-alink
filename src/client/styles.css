@@ -1,7 +1,11 @@
 .dsh-alink {
   height: 100%; min-height: 0; min-width: 0; max-width: 100%; overflow: auto;
   padding: 24px; box-sizing: border-box; color: inherit; font: inherit; container-type: inline-size;
-  --link-line: color-mix(in srgb,currentColor 15%,transparent);
+  --link-line: color-mix(in srgb,currentColor 11%,transparent);
+  --link-accent: light-dark(#006be0,#409cff);
+  --link-action: #006be0;
+  --link-tint: color-mix(in srgb,var(--link-accent) 11%,Canvas);
+  --link-group: color-mix(in srgb,currentColor 3%,Canvas);
   --link-muted: color-mix(in srgb,currentColor 60%,transparent);
 }
 .dsh-alink * { box-sizing: border-box; }
@@ -11,11 +15,11 @@
 .dsh-alink p { line-height: 1.6; }
 .dsh-alink-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 20px; }
 .dsh-alink-note { color: var(--link-muted); font-size: 12px; margin: 12px 0; }
-.dsh-alink button, .dsh-alink input, .dsh-alink select, .dsh-alink-operation-actions a {
+.dsh-alink button, .dsh-alink input, .dsh-alink select {
   font: inherit; font-size: 13px; line-height: 1.5; border: 1px solid var(--link-line);
   border-radius: 8px; padding: 9px 12px; color: inherit; background: transparent; min-width: 0; max-width: 100%;
 }
-.dsh-alink button, .dsh-alink-operation-actions a { cursor: pointer; text-decoration: none; height: auto; white-space: normal; overflow-wrap: anywhere; }
+.dsh-alink button { cursor: pointer; text-decoration: none; height: auto; white-space: normal; overflow-wrap: anywhere; }
 .dsh-alink button:hover { background: color-mix(in srgb,currentColor 6%,transparent); }
 .dsh-alink button:disabled { opacity: .45; cursor: default; }
 .dsh-alink button.primary { background: CanvasText; color: Canvas; border-color: CanvasText; }
@@ -32,12 +36,18 @@
 .dsh-alink-sources { padding: 18px; min-width: 0; border-right: 1px solid var(--link-line); }
 .dsh-alink-sources>input { margin: 13px 0; }
 .dsh-alink-session-list { max-height: 55vh; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
-.dsh-alink-project { min-width: 0; border-bottom: 1px solid var(--link-line); padding: 10px 0; }
-.dsh-alink-project:last-child { border-bottom: 0; }
-.dsh-alink-project summary { cursor: pointer; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-.dsh-alink-project summary small { margin-left: 8px; font-size: 11px; font-weight: 400; color: var(--link-muted); }
-.dsh-alink-project-path { margin: 5px 0 8px; font-size: 11px; color: var(--link-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dsh-alink-project-sessions { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.dsh-alink-project { min-width: 0; margin: 6px 0; padding: 3px; border-radius: 12px; background: var(--link-group); }
+.dsh-alink-project summary { display: flex; align-items: center; gap: 5px; min-width: 0; padding: 4px 6px; list-style: none; cursor: pointer; border-radius: 9px; font-size: 13px; font-weight: 600; }
+.dsh-alink-project summary::-webkit-details-marker { display: none; }
+.dsh-alink-project summary::marker { content: ""; }
+.dsh-alink-project summary:hover { background: color-mix(in srgb,currentColor 4%,transparent); }
+.dsh-alink-project-name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dsh-alink-chevron { width: 10px; height: 10px; flex-shrink: 0; fill: none; stroke: var(--link-muted); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform .18s ease; }
+.dsh-alink-project[open]>summary .dsh-alink-chevron { transform: rotate(90deg); }
+.dsh-alink-folder { width: 18px; height: 18px; flex-shrink: 0; fill: color-mix(in srgb,var(--link-accent) 14%,transparent); stroke: var(--link-accent); stroke-width: 1.25; margin-right: 2px; }
+.dsh-alink-project summary small { min-width: 20px; padding: 2px 5px; border-radius: 6px; text-align: center; font-size: 11px; font-weight: 500; color: var(--link-muted); font-variant-numeric: tabular-nums; }
+.dsh-alink-project-path { margin: 0 10px 7px 61px; font-size: 10px; color: var(--link-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsh-alink-project-sessions { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin: 0 2px 5px 19px; }
 .dsh-alink-project-sessions button { display: block; flex-shrink: 0; text-align: left; border-color: transparent; padding: 10px; width: 100%; }
 .dsh-alink-preview { padding: 24px; min-width: 0; }
 .dsh-alink-empty { padding: 24px 6px; color: var(--link-muted); font-size: 13px; }
@@ -54,7 +64,7 @@
 .dsh-alink-operations article>div:first-child { min-width: 0; display: grid; gap: 5px; font-size: 13px; overflow-wrap: anywhere; }
 .dsh-alink-operations article span, .dsh-alink-operations article small { font-size: 11px; color: var(--link-muted); }
 .dsh-alink-operation-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex-shrink: 0; max-width: 55%; }
-.dsh-alink-operation-actions button, .dsh-alink-operation-actions a { font-size: 11px; padding: 7px 9px; }
+.dsh-alink-operation-actions button { font-size: 11px; padding: 7px 9px; }
 @container (max-width: 720px) {
   .dsh-alink-columns { grid-template-columns: minmax(0,1fr); }
   .dsh-alink-sources { border-right: 0; border-bottom: 1px solid var(--link-line); }
@@ -72,14 +82,21 @@
 .dsh-alink-header nav button.current { background: color-mix(in srgb,currentColor 7%,transparent); font-weight: 600; }
 .dsh-alink-header-actions, .dsh-alink-primary-actions, .dsh-alink-task-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dsh-alink-columns { grid-template-columns: minmax(260px,35%) minmax(0,1fr); }
-.dsh-alink input[type=checkbox] { appearance: auto; accent-color: CanvasText; width: 16px; height: 16px; min-width: 16px; padding: 0; margin: 0; display: inline-block; vertical-align: middle; }
+.dsh-alink-check { width: 28px; height: 28px; flex: 0 0 28px; display: inline-flex; align-items: center; justify-content: center; }
+.dsh-alink .dsh-alink-check input[type=checkbox] { appearance: none; width: 28px; height: 28px; min-width: 28px; margin: 0; padding: 0; border: 0; border-radius: 7px; background: none; position: relative; cursor: pointer; outline: none; }
+.dsh-alink-check input::before { content: ""; position: absolute; inset: 5px; border: 1px solid color-mix(in srgb,currentColor 25%,transparent); border-radius: 5px; background: Canvas; transition: background .12s, border-color .12s, box-shadow .12s; }
+.dsh-alink-check input:checked::before, .dsh-alink-check input:indeterminate::before { background: var(--link-action); border-color: var(--link-action); }
+.dsh-alink-check input:checked::after { content: ""; position: absolute; left: 11px; top: 8px; width: 5px; height: 9px; border: solid white; border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); }
+.dsh-alink-check input:indeterminate::after { content: ""; position: absolute; width: 8px; height: 2px; left: 10px; top: 13px; border: 0; border-radius: 2px; background: white; transform: none; }
+.dsh-alink-check input:focus-visible::before { box-shadow: 0 0 0 3px color-mix(in srgb,var(--link-accent) 25%,transparent); border-color: var(--link-accent); }
+.dsh-alink-check input:disabled { opacity: .45; cursor: default; }
 .dsh-alink-list-tools { display: flex; justify-content: space-between; align-items: center; color: var(--link-muted); font-size: 12px; margin: 12px 0; }
 .dsh-alink-list-tools label { display: flex; align-items: center; gap: 8px; }
-.dsh-alink .dsh-alink-project summary input[type=checkbox] { margin: 0 8px 0 3px; }
-.dsh-alink-session-row { display: flex; align-items: flex-start; gap: 8px; border: 1px solid transparent; border-radius: 8px; padding-left: 8px; min-width: 0; }
-.dsh-alink .dsh-alink-session-row>input[type=checkbox] { margin-top: 13px; }
-.dsh-alink-session-row.selected { background: color-mix(in srgb,currentColor 5%,transparent); border-color: var(--link-line); }
-.dsh-alink-project-sessions .dsh-alink-session-row button { flex: 1; min-width: 0; width: auto; padding: 9px 7px; }
+.dsh-alink-session-row { display: flex; align-items: center; gap: 2px; border: 0; border-radius: 9px; padding: 2px 5px; min-width: 0; transition: background .12s; }
+.dsh-alink-session-row:hover { background: color-mix(in srgb,currentColor 4%,transparent); }
+.dsh-alink-session-row.selected { background: var(--link-tint); color: var(--link-accent); }
+.dsh-alink-project-sessions .dsh-alink-session-row button { flex: 1; min-width: 0; width: auto; padding: 8px 5px; border: 0; border-radius: 6px; background: none; font-size: 12px; }
+.dsh-alink-session-row button>span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dsh-alink-selection-heading { display: flex; align-items: start; gap: 12px; justify-content: space-between; }
 .dsh-alink-selection-heading button { font-size: 11px; padding: 3px 7px; flex-shrink: 0; }
 .dsh-alink-picked { list-style: none; padding: 0; margin: 0 0 18px; max-height: 150px; overflow: auto; }
@@ -98,10 +115,8 @@
 .dsh-alink-transfer strong { font-size: 13px; }
 .dsh-alink-transfer span, .dsh-alink-transfer small { font-size: 12px; color: var(--link-muted); overflow-wrap: anywhere; }
 .dsh-alink-task-actions { flex-shrink: 0; max-width: 50%; justify-content: flex-end; }
-.dsh-alink-task-actions a { display: inline-block; font-size: 13px; color: CanvasText; border: 1px solid var(--link-line); border-radius: 8px; padding: 9px 12px; text-decoration: none; }
 .dsh-alink-local { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto; align-items: end; gap: 12px; border: 1px solid var(--link-line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .dsh-alink-local input[type=file] { font-size: 11px; }
-.dsh-alink-notice { font-size: 13px; color: var(--link-muted); }
 .dsh-alink-operations { margin-top: 0; }
 @container (max-width: 760px) {
   .dsh-alink-columns { grid-template-columns: minmax(0,1fr); }
@@ -112,7 +127,43 @@
   .dsh-alink-task-actions { max-width: none; justify-content: flex-start; }
 }
 @media (max-width: 600px) { .dsh-alink-header-actions { width: 100%; } .dsh-alink-header-actions button { flex: 1; } }
-.dsh-alink-transfer.is-complete { flex-direction: row; align-items: center; padding: 10px 14px; }
-.dsh-alink-transfer.is-complete>div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.dsh-alink-transfer.is-complete .dsh-alink-task-actions { width: auto; max-width: 50%; }
-.dsh-alink-transfer.is-complete button, .dsh-alink-transfer.is-complete a { padding: 6px 9px; font-size: 11px; }
+
+.dsh-alink-toast { position: fixed; z-index: 1000; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 11px; width: max-content; max-width: min(420px,calc(100vw - 32px)); padding: 13px 14px; border: 1px solid var(--link-line); border-radius: 14px; color: CanvasText; background: color-mix(in srgb,Canvas 90%,transparent); backdrop-filter: blur(20px); box-shadow: 0 8px 32px #0002, 0 1px 4px #0001; animation: alink-toast-in .2s ease-out; }
+.dsh-alink-toast-icon { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; color: white; background: #30a46c; font-size: 14px; font-weight: 600; }
+.dsh-alink-toast.is-error .dsh-alink-toast-icon { background: #d27b21; }
+.dsh-alink-toast strong { font-size: 13px; font-weight: 600; }
+.dsh-alink-toast p { margin: 3px 0 0; color: var(--link-muted); font-size: 12px; overflow-wrap: anywhere; }
+.dsh-alink-toast button { border: 0; padding: 2px 5px; color: var(--link-muted); font-size: 18px; margin-left: 6px; }
+.dsh-alink-reading { min-height: 180px; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; align-items: center; gap: 10px; border-radius: 12px; background: var(--link-group); color: var(--link-muted); font-size: 12px; }
+.dsh-alink-spinner { width: 18px; height: 18px; border: 2px solid color-mix(in srgb,currentColor 15%,transparent); border-top-color: var(--link-accent); border-radius: 50%; animation: alink-spin .75s linear infinite; }
+.dsh-alink-skeleton { width: 100%; display: grid; gap: 8px; padding: 18px 24px 0; }
+.dsh-alink-skeleton i { height: 7px; border-radius: 5px; background: color-mix(in srgb,currentColor 7%,transparent); }
+.dsh-alink-skeleton i:nth-child(2) { width: 88%; }.dsh-alink-skeleton i:nth-child(3) { width: 63%; }
+.dsh-alink-read-error { font-size: 12px; color: var(--link-muted); padding: 18px; border-radius: 12px; background: var(--link-group); }
+.dsh-alink-operations button.dsh-alink-record-title { padding: 0; border: 0; text-align: left; font-weight: 600; }
+.dsh-alink-task-result { border: 1px solid var(--link-line); border-radius: 10px; padding: 12px; margin-bottom: 12px; font-size: 12px; }
+.dsh-alink-task-result summary { cursor: pointer; }.dsh-alink-task-result p { color: var(--link-muted); }
+@keyframes alink-spin { to { transform: rotate(360deg); } }
+@keyframes alink-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .dsh-alink-spinner,.dsh-alink-toast { animation: none; }.dsh-alink-chevron { transition: none; } }
+
+/* The selection inspector uses grouped controls and compact trailing actions. */
+.dsh-alink-selection-heading { align-items: center; margin-bottom: 14px; }
+.dsh-alink-selection-heading h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.2px; }
+.dsh-alink-selection-heading button { border: 0; background: transparent; color: var(--link-accent); font-size: 12px; padding: 5px 0 5px 10px; }
+.dsh-alink-picked { margin: 0 0 16px; border: 1px solid var(--link-line); border-radius: 12px; background: var(--link-group); }
+.dsh-alink-picked li { min-height: 42px; padding: 9px 12px; border-bottom: 1px solid var(--link-line); }
+.dsh-alink-picked li:last-child { border-bottom: 0; }
+.dsh-alink-picked small { border-radius: 5px; padding: 2px 5px; background: color-mix(in srgb,currentColor 5%,Canvas); font-size: 10px; }
+.dsh-alink-picked button { display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; padding: 0; border-radius: 50%; background: color-mix(in srgb,currentColor 6%,transparent); color: var(--link-muted); font-size: 15px; }
+.dsh-alink-targets { grid-template-columns: minmax(0,1fr); gap: 0; margin-bottom: 16px; border: 1px solid var(--link-line); border-radius: 12px; background: var(--link-group); overflow: hidden; }
+.dsh-alink-targets>label { display: grid; grid-template-columns: 90px minmax(0,1fr); align-items: center; gap: 12px; padding: 5px 12px; font-size: 12px; font-weight: 500; }
+.dsh-alink-targets>label+label { border-top: 1px solid var(--link-line); }
+.dsh-alink-targets select { margin: 0; border-color: transparent; background-color: transparent; text-align: right; text-align-last: right; border-radius: 7px; }
+.dsh-alink-targets select:hover { background-color: color-mix(in srgb,currentColor 3%,Canvas); }
+.dsh-alink-unified { padding: 12px; border: 1px solid var(--link-line); border-radius: 12px; background: var(--link-group); }
+.dsh-alink-primary-actions { justify-content: flex-end; padding-top: 2px; gap: 10px; }
+.dsh-alink-primary-actions button { flex: 0 1 auto; min-width: 136px; min-height: 40px; padding: 9px 18px; border-radius: 10px; font-size: 13px; font-weight: 500; background: var(--link-group); }
+.dsh-alink-primary-actions button.primary { background: var(--link-action); border-color: var(--link-action); color: white; box-shadow: 0 1px 2px #0001; }
+.dsh-alink-primary-actions button.primary:hover { background: #005fc9; }
+@container (max-width: 460px) { .dsh-alink-targets>label { grid-template-columns: minmax(0,1fr); gap: 0; padding-top: 10px; }.dsh-alink-targets select { text-align: left; text-align-last: left; padding-left: 0; }.dsh-alink-primary-actions button { flex: 1; min-width: 0; padding-inline: 10px; } }

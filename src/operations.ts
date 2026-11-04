@@ -35,6 +35,7 @@ export class MigrationService {
   readonly ledger: Ledger;
   private readonly jobs = new Map<string, { operation: Operation; controller: AbortController; promise: Promise<void> }>();
   private accepting = true;
+  private readonly inspections = new Map<string, ReturnType<typeof conversationMessages>>();
   private readonly exports = new Map<string, Promise<string>>();
   private constructor(readonly options: Options) { this.ledger = new Ledger(path.join(options.directory, 'operations.sqlite')); }
   static async create(options: Options): Promise<MigrationService> {
@@ -62,6 +63,27 @@ export class MigrationService {
     const result = upload ? await this.options.worker.run<CaptureResult>({ kind: 'import', path: upload.archivePath, destination }, signal)
       : await this.options.worker.run<CaptureResult>({ kind: 'capture', roots: this.options.roots, resourceRoots: this.options.resourceRoots, sourceId, destination }, signal);
     await this.source(sourceId, signal); return result;
+  }
+  async inspect(sourceId: string, signal?: AbortSignal) {
+    this.ready();
+    const source = await this.source(sourceId, signal), id = randomUUID();
+    const destination = path.join(this.options.directory, 'snapshots', 'inspect-' + id);
+    try {
+      const capture = await this.captureSource(sourceId, destination, signal);
+      // This target is only input to the shared mapper; no import plan or receipt is saved.
+      const plan = await buildMigrationPlan(capture.archivePath, { cwd: source.cwd || '', agentPreset: '' }, this.options.limits);
+      signal?.throwIfAborted(); this.ready();
+      this.inspections.set(id, conversationMessages(plan));
+      while (this.inspections.size > 3) this.inspections.delete(this.inspections.keys().next().value!);
+      return { title: source.title, ...this.inspectionPage(id) };
+    } finally { await rm(destination, { recursive: true, force: true }); }
+  }
+  inspectionPage(id: string, offset = 0) {
+    const messages = this.inspections.get(id); if (!messages) throw new LinkError('PREVIEW_NOT_FOUND');
+    if (!Number.isSafeInteger(offset) || offset < 0) throw new LinkError('INVALID_QUERY');
+    this.inspections.delete(id); this.inspections.set(id, messages);
+    return { inspectionId: id, total: messages.length, offset, items: messages.slice(offset, offset + 80).map(message => ({ ...message,
+      content: message.content.map(block => block.text.length > 20000 ? { ...block, text: block.text.slice(0, 20000) + '\n…（仅展示截断，迁入保留完整内容）' } : block) })) };
   }
   async preview(sourceId: string, target: TargetSelection, signal?: AbortSignal): Promise<Preview> {
     this.ready(); const resolved = await this.options.resolveTarget(target);
@@ -264,6 +286,6 @@ export class MigrationService {
     this.accepting = false;
     for (const job of this.jobs.values()) job.controller.abort();
     await Promise.allSettled([...this.jobs.values()].map(j => j.promise));
-    await this.options.worker.close(); this.ledger.close();
+    await this.options.worker.close(); this.inspections.clear(); this.ledger.close();
   }
 }

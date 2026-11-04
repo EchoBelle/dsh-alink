@@ -47,6 +47,8 @@ export async function apply(ctx: Context, config: PluginConfig): Promise<void> {
       case 'sources': return service.sources();
       case 'sessions': return service.sessions(p.app, { text: p.text, cursor: p.cursor, limit: p.limit });
       case 'targets': return { workspaces: ctx.workspaceRegistry.list().map(w => ({ id: w.id, path: w.path, title: w.title })), presets: await ctx.agentPresets.list(), defaultPreset: ctx.agentPresets.defaultId };
+      case 'inspect': return service.inspect(p.sourceId, signal);
+      case 'inspectionPage': return service.inspectionPage(p.inspectionId, p.offset);
       case 'preview': return service.preview(p.sourceId, p.target, signal);
       case 'previewPage': return service.previewPage(p.previewId, p.offset);
       case 'commit': return service.commit({ previewId: p.previewId, reportHash: p.reportHash, requestId: p.requestId });

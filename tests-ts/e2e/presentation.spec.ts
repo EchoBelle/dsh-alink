@@ -34,7 +34,7 @@ test('groups projects, shows only dialogue and keeps long content inside both la
   await expect(group.getByRole('button')).toBeHidden();
   await group.locator('summary').click();
   await group.getByRole('button').click();
-  await page.getByRole('button', { name: '查看对话', exact: true }).click();
+  await expect(page.getByRole('button', { name: '查看对话', exact: true })).toHaveCount(0);
   const history = page.getByRole('region', { name: '对话历史', exact: true });
   await expect(history.locator('article')).toHaveCount(2);
   await expect(history).toContainText('这是用户的问题。');

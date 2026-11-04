@@ -89,7 +89,7 @@ try {
     `- id: dsh-alink\n  config:\n    dataDir: ${JSON.stringify(path.join(home,'link-data'))}\n    sourceRoots:\n${Object.entries(roots).map(([key,value])=>'      '+key+': '+JSON.stringify(value)).join('\n')}`,
   ].join('\n')+'\n');
   await start('import');await save('Testing four source applications through native UI');
-  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/00-batch.spec.ts','tests-ts/e2e/all-sources.spec.ts','tests-ts/e2e/archive-guard.spec.ts','tests-ts/e2e/recovery-ui.spec.ts','tests-ts/e2e/plugin-shell.spec.ts','tests-ts/e2e/presentation.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_PACKAGE_MATRIX:'1'},log:'release-browser.log'});
+  await run(path.join(project,'node_modules/.bin/playwright'),['test','tests-ts/e2e/00-batch.spec.ts','tests-ts/e2e/all-sources.spec.ts','tests-ts/e2e/archive-guard.spec.ts','tests-ts/e2e/recovery-ui.spec.ts','tests-ts/e2e/plugin-shell.spec.ts','tests-ts/e2e/presentation.spec.ts','tests-ts/e2e/ui-feedback.spec.ts'],{cwd:project,env:{DSH_ALINK_TEST_HOME:home,DSH_ALINK_PACKAGE_MATRIX:'1'},log:'release-browser.log'});
   await stop();
   const db=new DatabaseSync(path.join(home,'link-data/operations.sqlite'),{readOnly:true});
   const ops=db.prepare('SELECT value FROM operations').all().map(row=>JSON.parse(row.value));db.close();

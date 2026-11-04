@@ -4,7 +4,7 @@
 
 ```sh
 dsh --profile web --dump-config
-dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.2.0
+dsh plugin --profile web add --workspace-root github:EchoBelle/dsh-alink#v0.2.1
 dsh web
 ```
 
@@ -45,7 +45,7 @@ pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
-node scripts/release-smoke.mjs github:EchoBelle/dsh-alink#v0.2.0
+node scripts/release-smoke.mjs github:EchoBelle/dsh-alink#v0.2.1
 ```
 
 需要本机 Google Chrome。验收使用合成来源和本地测试模型，不迁移日常会话，不发起真实模型请求。结果保存在 .local/releases/latest-smoke.json，日志位于 .local/verification。

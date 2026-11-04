@@ -171,3 +171,17 @@ it('recovers a batch using its saved preview after native commit but before the 
     } finally { await reopened.close(); }
   } finally { await f.cleanup(); }
 });
+
+it('reads dialogue without a valid target or a committable migration preview', async () => {
+  const f = await fixture();
+  try {
+    f.db.exec("UPDATE sessions SET cwd='/missing-project-for-inspection'");
+    const view = await f.service.inspect(f.ids(['a'])[0]);
+    expect(view.total).toBe(2); expect(view.items.map(item => item.role)).toEqual(['user', 'assistant']);
+    expect(f.service.operations()).toEqual([]); expect(await f.ctx.sessionPersistence.list()).toEqual([]);
+    await expect(f.service.commit({ previewId: view.inspectionId, reportHash: '0'.repeat(64), requestId: 'inspect-is-readonly' })).rejects.toMatchObject({ code: 'PREVIEW_NOT_FOUND' });
+    expect(f.service.inspectionPage(view.inspectionId, 1).items).toHaveLength(1);
+    const { readdir } = await import('node:fs/promises');
+    expect(await readdir(path.join(f.root, 'data/snapshots'))).toEqual([]);
+  } finally { await f.cleanup(); }
+});

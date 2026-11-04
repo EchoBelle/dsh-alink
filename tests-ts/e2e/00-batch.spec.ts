@@ -1,10 +1,17 @@
 import { expect, test } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { openHarness } from '../helpers/browser.js';
 test.skip(!process.env.DSH_ALINK_PACKAGE_MATRIX, 'Clean package matrix only');
 test('exports selected projects before migration, imports the package in bulk, and deletes only a record', async ({ page }) => {
   const root = process.env.DSH_ALINK_TEST_HOME!, { url } = JSON.parse(await readFile(path.join(root, 'host.json'), 'utf8'));
+  await page.addInitScript(() => {
+    const state = { bytes: [] as number[], picked: false, saved: false };
+    Object.assign(window, { alinkSaveTest: state, showSaveFilePicker: async () => {
+      state.picked = true;
+      return { name: 'Alink-test.zip', createWritable: async () => new WritableStream<Uint8Array>({ write(chunk) { for (const byte of chunk) state.bytes.push(byte); }, close() { state.saved = true; } }) };
+    } });
+  });
   await openHarness(page, url); await page.getByRole('button', { name: 'Alink', exact: true }).click();
   await page.getByRole('checkbox', { name: '选择会话：活动会话 海星', exact: true }).check();
   await page.getByLabel('来源应用').selectOption('codex');
@@ -12,11 +19,17 @@ test('exports selected projects before migration, imports the package in bulk, a
   await expect(page.getByRole('button', { name: '导入所选（2）' })).toBeEnabled();
   await page.getByRole('button', { name: '导出所选（2）' }).click();
   await expect(page.getByText('导出完成', { exact: true })).toBeVisible({ timeout: 30000 });
+  const toastBox = await page.locator('.dsh-alink-toast').boundingBox();
+  expect(toastBox!.width).toBeLessThan(450);
+  await page.screenshot({ path: '.local/verification/alink-success-toast.png' });
   const rpc = async (endpoint: string, payload: unknown = {}) => (await page.request.post(new URL('/api/dsh-alink.rpc', url).href, { data: { endpoint, payload }, headers: { Origin: new URL(url).origin } })).json();
   expect((await rpc('operations')).value).toHaveLength(0);
-  const downloaded = page.waitForEvent('download');
-  await page.getByRole('link', { name: '下载导出包' }).click();
-  const download = await downloaded, file = path.join(root, 'bulk-export.zip'); await download.saveAs(file);
+  const saved = await page.evaluate(() => (window as Window & { alinkSaveTest?: { bytes: number[]; picked: boolean; saved: boolean } }).alinkSaveTest!);
+  expect(saved.picked).toBe(true); expect(saved.saved).toBe(true);
+  const file = path.join(root, 'bulk-export.zip'); await writeFile(file, Buffer.from(saved.bytes));
+  await expect(page.getByRole('link', { name: '下载导出包' })).toHaveCount(0);
+  await expect(page.getByText('导出完成', { exact: true })).toBeHidden({ timeout: 6000 });
+  await expect(page.getByRole('region', { name: '任务进度' })).toHaveCount(0);
   await page.getByRole('button', { name: '清空选择' }).click();
   await page.getByRole('button', { name: '从本地导入', exact: true }).click();
   await page.getByLabel('备份文件').setInputFiles(file);

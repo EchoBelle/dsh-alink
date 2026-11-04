@@ -23,6 +23,7 @@ export declare class MigrationService {
     readonly ledger: Ledger;
     private readonly jobs;
     private accepting;
+    private readonly inspections;
     private readonly exports;
     private constructor();
     static create(options: Options): Promise<MigrationService>;
@@ -36,6 +37,31 @@ export declare class MigrationService {
     private upload;
     source(sourceId: string, signal?: AbortSignal): Promise<SourceLocator>;
     captureSource(sourceId: string, destination: string, signal?: AbortSignal): Promise<CaptureResult>;
+    inspect(sourceId: string, signal?: AbortSignal): Promise<{
+        inspectionId: string;
+        total: number;
+        offset: number;
+        items: {
+            content: {
+                type: "text";
+                text: string;
+            }[];
+            role: "user" | "assistant";
+        }[];
+        title: string;
+    }>;
+    inspectionPage(id: string, offset?: number): {
+        inspectionId: string;
+        total: number;
+        offset: number;
+        items: {
+            content: {
+                type: "text";
+                text: string;
+            }[];
+            role: "user" | "assistant";
+        }[];
+    };
     preview(sourceId: string, target: TargetSelection, signal?: AbortSignal): Promise<Preview>;
     private stored;
     previewPage(id: string, offset?: number): {
