@@ -40,6 +40,9 @@ test('groups projects, shows only dialogue and keeps long content inside both la
   await expect(page.getByText('仅显示未归档且当前有效的会话')).toHaveCount(0);
   for (const width of [1440, 900, 600]) {
     await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate(async () => {
+      await Promise.all(document.getAnimations().filter(a => a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+    });
     await expect.poll(() => page.locator('.dsh-alink').evaluate(root => {
       const sources = root.querySelector('.dsh-alink-sources')!.getBoundingClientRect();
       const preview = root.querySelector('.dsh-alink-preview')!.getBoundingClientRect();
