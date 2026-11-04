@@ -1,0 +1,22 @@
+import { DatabaseSync } from 'node:sqlite';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { zstdCompressSync } from 'node:zlib';
+export async function createSources(home) {
+  const base = path.join(home, 'sources'), roots = Object.fromEntries(['workbuddy','codex','raccoon','cursor','dsh'].map(app => [app, path.join(base, app)]));
+  for (const root of Object.values(roots)) await mkdir(root, { recursive: true });
+  const rows = id => [{ type: 'message', role: 'user', content: '项目代号：海星', sessionId: id }, { type: 'message', role: 'assistant', content: '已记录海星。', sessionId: id }];
+  const jsonl = async (file, values) => { await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, values.map(row => JSON.stringify(row)).join('\n') + '\n'); };
+  let db = new DatabaseSync(path.join(roots.workbuddy, 'workbuddy.db'));
+  db.exec('CREATE TABLE sessions(id TEXT PRIMARY KEY,title TEXT,cwd TEXT,status TEXT,deleted_at INTEGER,updated_at INTEGER)');
+  for (const [id,title,status] of [['active','活动会话 海星','completed'],['archived','已归档会话 不应出现','archived']]) { db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?)').run(id,title,home,status,null,1); await jsonl(path.join(roots.workbuddy,'projects/p',id+'.jsonl'),rows(id)); } db.close();
+  db = new DatabaseSync(path.join(roots.codex,'state_5.sqlite')); db.exec('CREATE TABLE threads(id TEXT,title TEXT,name TEXT,cwd TEXT,rollout_path TEXT,updated_at INTEGER,archived INTEGER,source TEXT,thread_source TEXT)');
+  for (const [id,archived] of [['active',0],['archived',1]]) { const file=path.join(roots.codex,'sessions',id+'.jsonl'); db.prepare('INSERT INTO threads VALUES (?,?,?,?,?,?,?,?,?)').run(id,archived?'Codex 不应出现':'Codex 活动会话','',home,file,1,archived,'vscode','user'); await jsonl(file,[{type:'session_meta',payload:{id,cwd:home}},...rows(id).map(row=>({type:'response_item',payload:row}))]); } db.close();
+  db = new DatabaseSync(path.join(roots.raccoon,'local-chat.sqlite3')); db.exec('CREATE TABLE sessions(id TEXT,title TEXT,workspace_dir TEXT,available INTEGER,updated_at_ms INTEGER); CREATE TABLE messages(id TEXT,session_id TEXT,seq INTEGER,type TEXT,role TEXT,payload_json TEXT,created_at_ms INTEGER,active INTEGER,visible INTEGER,turn_id TEXT)');
+  for (const [id,available] of [['active',1],['archived',0]]) { db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?)').run(id,available?'小浣熊 活动会话':'小浣熊 不应出现',home,available,1); for(const [i,row] of rows(id).entries()) db.prepare('INSERT INTO messages VALUES (?,?,?,?,?,?,?,?,?,?)').run(id+i,id,i,'text',row.role,JSON.stringify({content:row.content}),1,1,1,'turn'); } db.close();
+  await mkdir(path.join(roots.cursor,'User/globalStorage'),{recursive:true}); db = new DatabaseSync(path.join(roots.cursor,'User/globalStorage/state.vscdb')); db.exec('CREATE TABLE composerHeaders(composerId TEXT,value TEXT,isArchived INTEGER,isSubagent INTEGER,lastUpdatedAt INTEGER); CREATE TABLE cursorDiskKV(key TEXT,value TEXT)');
+  for(const [id,archived] of [['active',0],['archived',1]]) { const meta={name:archived?'Cursor 不应出现':'Cursor 活动会话',workspaceIdentifier:{folder:'file://'+home},fullConversationHeadersOnly:[{bubbleId:'u'},{bubbleId:'a'}]}; db.prepare('INSERT INTO composerHeaders VALUES (?,?,?,?,?)').run(id,JSON.stringify(meta),archived,0,1); db.prepare('INSERT INTO cursorDiskKV VALUES (?,?)').run('composerData:'+id,JSON.stringify(meta)); for(const [i,row] of rows(id).entries()) { const bubbleId=i?'a':'u'; db.prepare('INSERT INTO cursorDiskKV VALUES (?,?)').run('bubbleId:'+id+':'+bubbleId,JSON.stringify({bubbleId,type:i?2:1,text:row.content})); } } db.close();
+  await mkdir(path.join(roots.dsh,'storages'),{recursive:true}); await writeFile(path.join(roots.dsh,'storages/workspace.json'),JSON.stringify({unit:{name:'workspace',version:2},global:{archivedSessionIds:['archived']}}));
+  for(const id of ['active','archived']) { const file=path.join(roots.dsh,'sessions/p',id,'session.jsonl.zstd');await mkdir(path.dirname(file),{recursive:true});await writeFile(file,zstdCompressSync([{type:'session',version:0,id,cwd:home}, {type:'user/message',seq:0,time:1,data:{content:[{type:'text',text:'项目代号：海星'}]}},{type:'assistant/message',seq:1,time:2,data:{turn:0,step:0,message:{content:[{type:'text',text:'已记录海星。'}]}}},{type:'session/title',seq:2,time:3,data:{title:id==='active'?'旧 DSH 活动会话':'DSH 不应出现'}}].map(r=>JSON.stringify(r)).join('\n')+'\n')); }
+  return roots;
+}

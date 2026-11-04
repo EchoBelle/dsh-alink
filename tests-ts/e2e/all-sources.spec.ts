@@ -1,0 +1,43 @@
+import { openHarness } from '../helpers/browser.js';
+import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+const cases = [['workbuddy','活动会话 海星'],['codex','Codex 活动会话'],['raccoon','小浣熊 活动会话'],['cursor','Cursor 活动会话']] as const;
+test.skip(!process.env.DSH_ALINK_PACKAGE_MATRIX, 'Full matrix uses the clean release-package home');
+for (const [app, title] of cases) test(`${app}: active source to native conversation`, async ({ page }) => {
+  const root = process.env.DSH_ALINK_TEST_HOME!;
+  const { url } = JSON.parse(await readFile(path.join(root, 'host.json'), 'utf8'));
+  await openHarness(page, url);
+  await expect(page.getByRole('button', { name: '会话迁移', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '会话迁移', exact: true }).click();
+  await page.getByLabel('来源应用').selectOption(app);
+  await expect(page.getByRole('button', { name: '打开预览：' + title })).toBeVisible();
+  await expect(page.getByRole('button', { name: /打开预览：.*不应出现/ })).toHaveCount(0);
+  await page.getByRole('button', { name: '打开预览：' + title }).click();
+  await page.getByLabel('目标项目目录').fill(root);
+  await page.getByRole('button', { name: '生成迁移预览', exact: true }).click();
+  await expect(page.getByText('项目代号：海星', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /^(导入会话|按上述差异导入)$/ }).click();
+  const op = page.getByRole('region', { name: '迁移记录' }).locator('article').filter({ has: page.getByText(title, { exact: true }) }).first();
+  await expect(op.getByText('迁移完成', { exact: true })).toBeVisible({ timeout: 30000 });
+  await op.getByRole('button', { name: '打开会话', exact: true }).click();
+  await expect(page.getByText('项目代号：海星', { exact: true })).toBeVisible();
+  await expect(page.getByText('已记录海星。', { exact: true })).toBeVisible();
+});
+
+test('legacy DSH file import verifies source status and creates a native conversation', async ({ page }) => {
+  const root=process.env.DSH_ALINK_TEST_HOME!, {url}=JSON.parse(await readFile(path.join(root,'host.json'),'utf8'));
+  await openHarness(page,url);await page.getByRole('button',{name:'会话迁移',exact:true}).click();
+  await page.getByText('从备份导入',{exact:true}).click();
+  await page.getByLabel('备份文件').setInputFiles(path.join(root,'sources/dsh/sessions/p/archived/session.jsonl.zstd'));
+  await expect(page.getByRole('alert')).toContainText('原会话已归档');
+  await page.getByLabel('备份文件').setInputFiles(path.join(root,'sources/dsh/sessions/p/active/session.jsonl.zstd'));
+  await expect(page.getByRole('heading',{name:'旧 DSH 活动会话',exact:true})).toBeVisible();
+  await page.getByLabel('目标项目目录').fill(root);await page.getByRole('button',{name:'生成迁移预览',exact:true}).click();
+  await expect(page.getByText('项目代号：海星',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:/^(导入会话|按上述差异导入)$/}).click();
+  const op=page.getByRole('region',{name:'迁移记录'}).locator('article').filter({has:page.getByText('旧 DSH 活动会话',{exact:true})}).first();
+  await expect(op.getByText('迁移完成',{exact:true})).toBeVisible({timeout:30000});
+  await op.getByRole('button',{name:'打开会话',exact:true}).click();
+  await expect(page.getByText('已记录海星。',{exact:true})).toBeVisible();
+});

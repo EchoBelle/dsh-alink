@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ALink 0.1 record",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^r[0-9]+$"
+    },
+    "locator": {
+      "type": "object"
+    },
+    "value": {}
+  },
+  "required": [
+    "id",
+    "locator",
+    "value"
+  ],
+  "additionalProperties": false
+}

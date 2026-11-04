@@ -1,0 +1,24 @@
+.local/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+build/
+dist/
+
+node_modules/
+lib/
+.superpowers/
+test-results/
+playwright-report/
+*.tgz
+
+# Local historical work and independent sibling plugin projects
+/legacy/
+/plugins/
+/docs/research/
+/docs/superpowers/
+.env
+.env.*
+!.env.example

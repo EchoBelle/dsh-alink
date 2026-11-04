@@ -1,0 +1,10 @@
+import { build } from 'esbuild';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+await mkdir('lib', { recursive: true });
+await build({ entryPoints: ['src/index.ts'], outfile: 'lib/index.js', bundle: true, platform: 'node', format: 'esm', target: 'node24', packages: 'external', sourcemap: true });
+await build({ entryPoints: ['src/sources/worker.ts'], outfile: 'lib/source-worker.js', bundle: true, platform: 'node', format: 'esm', target: 'node24', packages: 'external', sourcemap: true });
+const client = await build({ entryPoints: ['src/client/index.tsx'], bundle: true, platform: 'browser', loader: { '.css': 'text' }, format: 'cjs', target: 'es2022', external: ['react', 'react/*', '@deepseek-ai/*'], write: false });
+await writeFile('lib/client.js', `window.__ModuleLoader__.load({id:"dsh-alink",factory:function(require){var module={exports:{}};var exports=module.exports;\n${client.outputFiles[0].text}\nreturn module.exports;}});\n`);
+execFileSync('node_modules/.bin/tsc', ['-p', 'tsconfig.build.json'], { stdio: 'inherit' });
+execFileSync('node_modules/.bin/tsc', ['-p', 'tsconfig.client-build.json'], { stdio: 'inherit' });

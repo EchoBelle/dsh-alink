@@ -1,0 +1,7 @@
+{"id":"e0","seq":0,"kind":"metadata","record_ref":"r0","content":[],"projection":"auxiliary","native_type":"ai-title","timestamp":1789000000000}
+{"id":"e1","seq":1,"kind":"message","record_ref":"r1","content":[{"type":"text","text":"请记录这段示例内容，保留换行。\n第二行。"}],"role":"user","native_type":"message","timestamp":1789000000010,"native_id":"m1"}
+{"id":"e2","seq":2,"kind":"reasoning","record_ref":"r2","content":[{"type":"text","text":"这是人为编写的测试数据，不是真实模型推理记录。"}],"role":"assistant","native_type":"reasoning","timestamp":1789000000020,"native_id":"r1","parent_native_id":"m1"}
+{"id":"e3","seq":3,"kind":"tool_call","record_ref":"r3","content":[{"type":"tool_call","call_id":"call-demo","name":"write_note","arguments":"{\"text\":\"示例产物\"}","argument_encoding":"json_string"}],"role":"assistant","native_type":"function_call","timestamp":1789000000030,"native_id":"t1","parent_native_id":"r1"}
+{"id":"e4","seq":4,"kind":"tool_result","record_ref":"r4","content":[{"type":"tool_result","call_id":"call-demo","name":"write_note","output":{"type":"text","text":"示例产物\n"},"status":"completed"}],"role":"tool","native_type":"function_call_result","timestamp":1789000000040,"native_id":"t2","parent_native_id":"t1"}
+{"id":"e5","seq":5,"kind":"message","record_ref":"r5","content":[{"type":"text","text":"示例已记录。"}],"role":"assistant","native_type":"message","timestamp":1789000000050,"native_id":"m2","parent_native_id":"t2"}
+{"id":"e6","seq":6,"kind":"opaque","record_ref":"r6","content":[],"projection":"auxiliary","native_type":"future_vendor_record","timestamp":1789000000060}

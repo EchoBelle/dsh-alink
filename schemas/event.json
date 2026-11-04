@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ALink 0.1 event",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^e[0-9]+$"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "kind": {
+      "enum": [
+        "message",
+        "reasoning",
+        "tool_call",
+        "tool_result",
+        "artifact",
+        "checkpoint",
+        "compaction",
+        "plan",
+        "usage",
+        "metadata",
+        "lifecycle",
+        "opaque"
+      ]
+    },
+    "record_ref": {
+      "type": "string"
+    },
+    "content": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "text",
+              "tool_call",
+              "tool_result",
+              "resource",
+              "opaque"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "native_type": {
+            "type": "string"
+          },
+          "value": {},
+          "call_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "arguments": {},
+          "argument_encoding": {
+            "type": "string"
+          },
+          "output": {},
+          "status": {},
+          "resource_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "text"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "text"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "resource"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "resource_id"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "tool_call"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "call_id",
+                "name",
+                "arguments"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "tool_result"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "call_id",
+                "output"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "opaque"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "role": {
+      "type": "string"
+    },
+    "native_type": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": [
+        "string",
+        "number"
+      ]
+    },
+    "native_id": {
+      "type": "string"
+    },
+    "parent_native_id": {
+      "type": "string"
+    },
+    "turn_id": {
+      "type": "string"
+    },
+    "projection": {
+      "enum": [
+        "auxiliary",
+        "context",
+        "display"
+      ]
+    },
+    "visible": {
+      "type": "boolean"
+    },
+    "active": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "seq",
+    "kind",
+    "record_ref",
+    "content"
+  ],
+  "additionalProperties": false
+}
